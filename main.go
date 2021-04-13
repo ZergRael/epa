@@ -22,6 +22,10 @@ func init() {
 
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339})
 
+	if *BotToken == "" {
+		log.Fatal().Msg("Missing --token flag")
+	}
+
 	var err error
 	s, err = discordgo.New("Bot " + *BotToken)
 	if err != nil {
@@ -30,17 +34,11 @@ func init() {
 }
 
 func main() {
-	s.AddHandler(func(s *discordgo.Session, r *discordgo.Ready) {
-		err := s.UpdateGameStatus(0, "Dancin'")
-		if err != nil {
-			log.Error().Err(err).Msg("Unable to set game status")
-		}
-		log.Info().Msg("Bot is up!")
-	})
+	s.AddHandler(ready)
 
-	s.AddHandler(func(s *discordgo.Session, event *discordgo.MessageCreate) {
-		discordMessageHandler(s, event)
-	})
+	s.AddHandler(discordMessageHandler)
+
+	s.Identify.Intents = discordgo.IntentsAllWithoutPrivileged
 
 	err := s.Open()
 	if err != nil {
