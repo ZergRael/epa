@@ -35,8 +35,8 @@ func init() {
 
 func main() {
 	s.AddHandler(ready)
-
 	s.AddHandler(discordMessageHandler)
+	s.AddHandler(commandsHandler)
 
 	s.Identify.Intents = discordgo.IntentsAllWithoutPrivileged
 
@@ -46,15 +46,31 @@ func main() {
 	}
 	defer s.Close()
 
-	bot, err := s.User("@me")
-	if err != nil {
-		log.Error().Err(err).Msg("Error obtaining @me account details")
+	log.Debug().Msgf("Session opened for bot ID : %s", s.State.User.ID)
+
+	log.Info().Msg("Adding commands...")
+	for _, v := range commands {
+		cmd, err := s.ApplicationCommandCreate(s.State.User.ID, "", v)
+		if err != nil {
+			log.Fatal().Err(err).Msgf("Cannot create : %v", v.Name)
+		}
+		log.Debug().Msgf("Added command : %s [%s]", cmd.Name, cmd.ID)
 	}
 
-	log.Info().Msg("Invite the bot to your server with https://discordapp.com/oauth2/authorize?client_id=" + bot.ID + "&scope=bot")
+	log.Info().Msg("Invite the bot to your server with https://discordapp.com/oauth2/authorize?client_id=" + s.State.User.ID + "&scope=bot%20applications.commands")
 
 	stop := make(chan os.Signal)
 	signal.Notify(stop, os.Interrupt)
 	<-stop
+
+	log.Info().Msg("Removing commands...")
+	registeredCommands, err := s.ApplicationCommands(s.State.User.ID, "")
+	for _, v := range registeredCommands {
+		err := s.ApplicationCommandDelete(s.State.User.ID, "", v.ID)
+		if err != nil {
+			log.Fatal().Err(err).Msgf("Cannot delete : %v", v.Name)
+		}
+	}
+
 	log.Info().Msg("Graceful shutdown")
 }

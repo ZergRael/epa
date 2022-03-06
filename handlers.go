@@ -6,96 +6,75 @@ import (
 	"github.com/rs/zerolog/log"
 	"regexp"
 	"strconv"
-	"strings"
 	"time"
 )
 
-func ready(s *discordgo.Session, r *discordgo.Ready) {
-	err := s.UpdateGameStatus(0, commandPrefix+"help")
+func ready(s *discordgo.Session, _ *discordgo.Ready) {
+	err := s.UpdateGameStatus(0, "/epa")
 	if err != nil {
 		log.Error().Err(err).Msg("Unable to set game status")
 	}
 	log.Info().Msg("Bot is up!")
 }
 
-const commandPrefix = "!"
-
 func discordMessageHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
-	log.Debug().Str("message", m.Content).Send()
-
 	if m.Author.Bot {
 		//log.Debug().Msg("User is a bot and being ignored.")
 		return
 	}
 
+	log.Debug().Str("message", m.Content).Send()
+
 	var err error
-	var channel *discordgo.Channel
+	//var channel *discordgo.Channel
 	log.Debug().Str("channelID", m.ChannelID).Send()
-	channel, err = s.State.Channel(m.ChannelID)
+	_, err = s.State.Channel(m.ChannelID)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to read channel details")
-		channel, err = s.UserChannelCreate(m.Author.ID)
+		_, err = s.UserChannelCreate(m.Author.ID)
 		if err != nil {
 			log.Error().Err(err).Msg("Failed to create channel details")
 			return
 		}
 	}
+}
 
-	// Commands start with "."
-	if strings.Index(m.Content, commandPrefix) == 0 {
-		cmdArgs := strings.SplitN(m.Content, " ", 2)
-		switch cmdArgs[0] {
-		case commandPrefix + "help":
-			writeHelp(channel)
-		case commandPrefix + "zg":
-			if len(cmdArgs) > 1 {
-				addReminder("ZG", parseTime(cmdArgs[1]), 5, channel)
-			}
-		case commandPrefix + "ony":
-			if len(cmdArgs) > 1 {
-				addReminder("ONY", parseTime(cmdArgs[1]), 5, channel)
-			}
-		case commandPrefix + "rem":
-			if len(cmdArgs) > 1 {
-				addReminder("REMINDER", parseTime(cmdArgs[1]), 0, channel)
-			}
-		}
+func commandsHandler(s *discordgo.Session, interaction *discordgo.InteractionCreate) {
+	if commandFunc, ok := commandsHandlers[interaction.ApplicationCommandData().Name]; ok {
+		commandFunc(s, interaction)
 	}
 }
 
-func addReminder(remindType string, t *time.Time, diffMinutes int, channel *discordgo.Channel) {
+func addReminder(remindType string, t *time.Time, diffMinutes int, channelID string) error {
 	if t == nil {
-		_, err := s.ChannelMessageSend(channel.ID, "Failed to parse time")
+		_, err := s.ChannelMessageSend(channelID, "Failed to parse time")
 		if err != nil {
-			log.Error().Err(err).Msg("Failed to send message")
+			return err
 		}
-		return
+		return nil
 	}
 
 	at := t.Add(time.Duration(-diffMinutes) * time.Minute)
 	in := at.Sub(time.Now())
 	if in < 0 {
-		_, err := s.ChannelMessageSend(channel.ID, "Cannot set a reminder in the past")
+		_, err := s.ChannelMessageSend(channelID, "Cannot set a reminder in the past")
 		if err != nil {
-			log.Error().Err(err).Msg("Failed to send message")
+			return err
 		}
-		return
+		return nil
 	}
 
 	log.Info().Str("remindType", remindType).Time("t", *t).Dur("in", in).Int("diffMinutes", diffMinutes).Msg("Add reminder")
 
 	time.AfterFunc(in, func() {
 		log.Info().Str("remindType", remindType).Time("t", *t).Msg("Timer done")
-		_, err := s.ChannelMessageSend(channel.ID, fmt.Sprintf("@here Reminder %s (%s)", remindType, t.String()))
+		_, err := s.ChannelMessageSend(channelID, fmt.Sprintf("@here Reminder %s (%s)", remindType, t.String()))
 		if err != nil {
 			log.Error().Err(err).Msg("Failed to send message")
 		}
 	})
 
-	_, err := s.ChannelMessageSend(channel.ID, fmt.Sprintf("Reminder set for %s", at))
-	if err != nil {
-		log.Error().Err(err).Msg("Failed to send message")
-	}
+	return nil
 }
 
 var regexTimeH = regexp.MustCompile(`(\d{1,2})(?:[hH:\-]?(\d{2}))?`)
@@ -132,15 +111,4 @@ func parseTime(t string) *time.Time {
 	}
 
 	return &at
-}
-
-func writeHelp(channel *discordgo.Channel) {
-	content := fmt.Sprintf(`Available commands :
-%[1]shelp
-%[1]szg 17:53
-%[1]sony 18:55`, commandPrefix)
-	_, err := s.ChannelMessageSend(channel.ID, content)
-	if err != nil {
-		log.Error().Err(err).Msg("Failed to send message")
-	}
 }
