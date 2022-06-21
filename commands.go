@@ -40,7 +40,8 @@ var commandsHandlers = map[string]func(s *discordgo.Session, i *discordgo.Intera
 		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
 			Data: &discordgo.InteractionResponseData{
-				Content: "Alright",
+				Content: "That's me alright",
+				Flags:   uint64(discordgo.MessageFlagsEphemeral),
 			},
 		})
 	},
