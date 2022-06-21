@@ -59,7 +59,7 @@ func commandsHandler(s *discordgo.Session, interaction *discordgo.InteractionCre
 	}
 }
 
-func addReminder(remindType string, t *time.Time, diffMinutes int, channelID string) error {
+func addReminder(reason string, t *time.Time, diffMinutes int, channelID string) error {
 	if t == nil {
 		_, err := s.ChannelMessageSend(channelID, "Failed to parse time")
 		if err != nil {
@@ -78,13 +78,20 @@ func addReminder(remindType string, t *time.Time, diffMinutes int, channelID str
 		return nil
 	}
 
-	log.Info().Str("remindType", remindType).Time("t", *t).Dur("in", in).Int("diffMinutes", diffMinutes).Msg("Add reminder")
+	log.Info().Str("reason", reason).Time("t", *t).Dur("in", in).Int("diffMinutes", diffMinutes).Msg("Add reminder")
 
 	time.AfterFunc(in, func() {
-		log.Info().Str("remindType", remindType).Time("t", *t).Msg("Timer done")
-		_, err := s.ChannelMessageSend(channelID, fmt.Sprintf("@here Reminder %s (%s)", remindType, t.String()))
-		if err != nil {
-			log.Error().Err(err).Msg("Failed to send message")
+		log.Info().Str("reason", reason).Time("t", *t).Msg("Timer done")
+		if reason != "" {
+			_, err := s.ChannelMessageSend(channelID, fmt.Sprintf("@here Reminder %s (%s)", reason, t.String()))
+			if err != nil {
+				log.Error().Err(err).Msg("Failed to send message")
+			}
+		} else {
+			_, err := s.ChannelMessageSend(channelID, fmt.Sprintf("@here Reminder (%s)", t.String()))
+			if err != nil {
+				log.Error().Err(err).Msg("Failed to send message")
+			}
 		}
 	})
 
