@@ -17,6 +17,9 @@ var (
 
 var s *discordgo.Session
 
+// FIXME: Global commands register slowly, stick to guild specific commands for now
+const globalCommands = false
+
 func init() {
 	flag.Parse()
 
@@ -33,8 +36,39 @@ func init() {
 	}
 }
 
+func addCommands(guildID string) {
+	log.Debug().Str("guildID", guildID).Msg("Adding commands...")
+
+	for _, v := range commands {
+		cmd, err := s.ApplicationCommandCreate(s.State.User.ID, guildID, v)
+		if err != nil {
+			log.Fatal().Err(err).Msgf("Cannot create : %v", v.Name)
+		}
+		log.Debug().Str("name", cmd.Name).Str("id", cmd.ID).Str("guild", guildID).Msg("Added command")
+	}
+}
+
+func removeCommands(guildID string) {
+	log.Debug().Str("guildID", guildID).Msg("Removing commands...")
+
+	registeredCommands, err := s.ApplicationCommands(s.State.User.ID, guildID)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to get current commands")
+		return
+	}
+
+	for _, v := range registeredCommands {
+		err := s.ApplicationCommandDelete(s.State.User.ID, guildID, v.ID)
+		if err != nil {
+			log.Fatal().Err(err).Msgf("Cannot delete : %v", v.Name)
+		}
+	}
+}
+
 func main() {
 	s.AddHandler(ready)
+	s.AddHandler(guildCreate)
+	s.AddHandler(guildDelete)
 	s.AddHandler(discordMessageHandler)
 	s.AddHandler(commandsHandler)
 
@@ -51,15 +85,10 @@ func main() {
 		}
 	}(s)
 
-	log.Debug().Msgf("Session opened for bot ID : %s", s.State.User.ID)
+	log.Debug().Str("id", s.State.User.ID).Msg("Session opened for bot")
 
-	log.Info().Msg("Adding commands...")
-	for _, v := range commands {
-		cmd, err := s.ApplicationCommandCreate(s.State.User.ID, "", v)
-		if err != nil {
-			log.Fatal().Err(err).Msgf("Cannot create : %v", v.Name)
-		}
-		log.Debug().Msgf("Added command : %s [%s]", cmd.Name, cmd.ID)
+	if globalCommands {
+		addCommands("")
 	}
 
 	log.Info().Msg("Invite the bot to your server with https://discordapp.com/oauth2/authorize?client_id=" + s.State.User.ID + "&scope=bot%20applications.commands")
@@ -68,13 +97,9 @@ func main() {
 	signal.Notify(stop, os.Interrupt)
 	<-stop
 
-	log.Info().Msg("Removing commands...")
-	registeredCommands, err := s.ApplicationCommands(s.State.User.ID, "")
-	for _, v := range registeredCommands {
-		err := s.ApplicationCommandDelete(s.State.User.ID, "", v.ID)
-		if err != nil {
-			log.Fatal().Err(err).Msgf("Cannot delete : %v", v.Name)
-		}
+	// FIXME: Figure out if we need to remove commands on shutdown
+	if globalCommands {
+		removeCommands("")
 	}
 
 	log.Info().Msg("Graceful shutdown")
