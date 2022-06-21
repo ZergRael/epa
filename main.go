@@ -44,7 +44,12 @@ func main() {
 	if err != nil {
 		log.Fatal().Err(err).Msg("Cannot open the session")
 	}
-	defer s.Close()
+	defer func(s *discordgo.Session) {
+		err := s.Close()
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to properly close session")
+		}
+	}(s)
 
 	log.Debug().Msgf("Session opened for bot ID : %s", s.State.User.ID)
 
