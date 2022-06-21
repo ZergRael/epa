@@ -9,6 +9,7 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/rs/zerolog/log"
+	"github.com/tidwall/buntdb"
 )
 
 var (
@@ -36,36 +37,20 @@ func init() {
 	}
 }
 
-func addCommands(guildID string) {
-	log.Debug().Str("guildID", guildID).Msg("Adding commands...")
-
-	for _, v := range commands {
-		cmd, err := s.ApplicationCommandCreate(s.State.User.ID, guildID, v)
-		if err != nil {
-			log.Fatal().Err(err).Msgf("Cannot create : %v", v.Name)
-		}
-		log.Debug().Str("name", cmd.Name).Str("id", cmd.ID).Str("guild", guildID).Msg("Added command")
-	}
-}
-
-func removeCommands(guildID string) {
-	log.Debug().Str("guildID", guildID).Msg("Removing commands...")
-
-	registeredCommands, err := s.ApplicationCommands(s.State.User.ID, guildID)
-	if err != nil {
-		log.Error().Err(err).Msg("Failed to get current commands")
-		return
-	}
-
-	for _, v := range registeredCommands {
-		err := s.ApplicationCommandDelete(s.State.User.ID, guildID, v.ID)
-		if err != nil {
-			log.Fatal().Err(err).Msgf("Cannot delete : %v", v.Name)
-		}
-	}
-}
-
 func main() {
+	// Database
+	db, err := buntdb.Open("data.db")
+	if err != nil {
+		log.Fatal().Err(err).Msg("Cannot open database")
+	}
+	defer func(db *buntdb.DB) {
+		err := db.Close()
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to properly close database")
+		}
+	}(db)
+
+	// Discordgo handlers
 	s.AddHandler(ready)
 	s.AddHandler(guildCreate)
 	s.AddHandler(guildDelete)
@@ -74,7 +59,8 @@ func main() {
 
 	s.Identify.Intents = discordgo.IntentsAllWithoutPrivileged
 
-	err := s.Open()
+	// Discordgo startup
+	err = s.Open()
 	if err != nil {
 		log.Fatal().Err(err).Msg("Cannot open the session")
 	}
@@ -93,6 +79,7 @@ func main() {
 
 	log.Info().Msg("Invite the bot to your server with https://discordapp.com/oauth2/authorize?client_id=" + s.State.User.ID + "&scope=bot%20applications.commands")
 
+	// Bot run loop
 	stop := make(chan os.Signal)
 	signal.Notify(stop, os.Interrupt)
 	<-stop

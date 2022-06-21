@@ -80,3 +80,32 @@ var commandsHandlers = map[string]func(s *discordgo.Session, i *discordgo.Intera
 		})
 	},
 }
+
+func addCommands(guildID string) {
+	log.Debug().Str("guildID", guildID).Msg("Adding commands...")
+
+	for _, v := range commands {
+		cmd, err := s.ApplicationCommandCreate(s.State.User.ID, guildID, v)
+		if err != nil {
+			log.Fatal().Err(err).Msgf("Cannot create : %v", v.Name)
+		}
+		log.Debug().Str("name", cmd.Name).Str("id", cmd.ID).Str("guild", guildID).Msg("Added command")
+	}
+}
+
+func removeCommands(guildID string) {
+	log.Debug().Str("guildID", guildID).Msg("Removing commands...")
+
+	registeredCommands, err := s.ApplicationCommands(s.State.User.ID, guildID)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to get current commands")
+		return
+	}
+
+	for _, v := range registeredCommands {
+		err := s.ApplicationCommandDelete(s.State.User.ID, guildID, v.ID)
+		if err != nil {
+			log.Fatal().Err(err).Msgf("Cannot delete : %v", v.Name)
+		}
+	}
+}
