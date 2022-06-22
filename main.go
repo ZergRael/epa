@@ -1,6 +1,7 @@
 package main
 
 import (
+	"epa/wclogs"
 	"flag"
 	"github.com/rs/zerolog"
 	"os"
@@ -49,6 +50,12 @@ func main() {
 			log.Error().Err(err).Msg("Failed to properly close database")
 		}
 	}(db)
+
+	w := wclogs.NewWCLogs("", "")
+	err = w.Test()
+	if err != nil {
+		log.Error().Err(err).Msg("Test failed")
+	}
 
 	// Discordgo handlers
 	s.AddHandler(ready)
