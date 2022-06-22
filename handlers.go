@@ -25,6 +25,8 @@ func guildCreate(_ *discordgo.Session, guild *discordgo.GuildCreate) {
 		// Add guild specific commands on guild join
 		addCommands(guild.ID)
 	}
+
+	instantiateWCLogsForGuild(guild.ID)
 }
 
 func guildDelete(_ *discordgo.Session, guild *discordgo.GuildDelete) {

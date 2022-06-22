@@ -26,10 +26,23 @@ type WCLogs struct {
 	client *graphql.Client
 }
 
-func NewWCLogs(clientID, clientSecret string) *WCLogs {
+type Credentials struct {
+	ClientID     string `json:"client_id"`
+	ClientSecret string `json:"client_secret"`
+}
+
+type rateLimit struct {
+	RateLimitData struct {
+		LimitPerHour        int
+		PointsSpentThisHour int
+		PointsResetIn       int
+	}
+}
+
+func NewWCLogs(creds *Credentials) *WCLogs {
 	c := clientcredentials.Config{
-		ClientID:     clientID,
-		ClientSecret: clientSecret,
+		ClientID:     creds.ClientID,
+		ClientSecret: creds.ClientSecret,
 		TokenURL:     tokenUri,
 		AuthStyle:    oauth2.AuthStyleInHeader,
 	}
@@ -43,7 +56,7 @@ func NewWCLogs(clientID, clientSecret string) *WCLogs {
 	return &w
 }
 
-func (w *WCLogs) Test() error {
+func (w *WCLogs) Check() bool {
 	req := graphql.NewRequest(`
     query {
         rateLimitData {
@@ -54,21 +67,13 @@ func (w *WCLogs) Test() error {
     }
 `)
 
-	// FIXME: this does not work
-	type responseStruct struct {
-		rateLimitData struct {
-			limitPerHour        int
-			pointsSpentThisHour int
-			pointsResetIn       int
-		}
-	}
-
-	var resp responseStruct
+	var resp rateLimit
 
 	if err := w.client.Run(context.Background(), req, &resp); err != nil {
-		return err
+		return false
 	}
 
-	log.Info().Msg("OK")
-	return nil
+	log.Debug().Interface("rateLimitData", resp.RateLimitData).Msg("WCLogs checked")
+
+	return true
 }

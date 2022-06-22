@@ -1,16 +1,15 @@
 package main
 
 import (
+	"epa/wclogs"
 	"fmt"
 	"github.com/bwmarrin/discordgo"
 	"github.com/rs/zerolog/log"
 )
 
+var falsePointer = false
+
 var commands = []*discordgo.ApplicationCommand{
-	{
-		Name:        "epa",
-		Description: "Bot status",
-	},
 	{
 		Name:        "ping",
 		Description: "Send a ping to the bot",
@@ -33,24 +32,59 @@ var commands = []*discordgo.ApplicationCommand{
 			},
 		},
 	},
+	{
+		Name:              "register-warcraftlogs",
+		Description:       "Setup credentials for WarcraftLogs API",
+		DefaultPermission: &falsePointer,
+		Options: []*discordgo.ApplicationCommandOption{
+			{
+				Type:        discordgo.ApplicationCommandOptionString,
+				Name:        "client-id",
+				Description: "Client ID from WCLogs API",
+				Required:    true,
+			},
+			{
+				Type:        discordgo.ApplicationCommandOptionString,
+				Name:        "client-secret",
+				Description: "Client secret from WCLogs API",
+				Required:    true,
+			},
+		},
+	},
 }
 
 var commandsHandlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate){
-	"epa": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-			Type: discordgo.InteractionResponseChannelMessageWithSource,
-			Data: &discordgo.InteractionResponseData{
-				Content: "That's me alright",
-				Flags:   uint64(discordgo.MessageFlagsEphemeral),
-			},
-		})
-	},
-
 	"ping": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
 			Data: &discordgo.InteractionResponseData{
 				Content: "Pong !",
+			},
+		})
+	},
+
+	"register-warcraftlogs": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+		clientID := i.ApplicationCommandData().Options[0].StringValue()
+		clientSecret := i.ApplicationCommandData().Options[1].StringValue()
+
+		creds := &wclogs.Credentials{ClientID: clientID, ClientSecret: clientSecret}
+		w := wclogs.NewWCLogs(creds)
+		response := "These API credentials cannot be used"
+		if w.Check() {
+			logs[i.GuildID] = w
+			log.Info().Str("guildID", i.GuildID).Msg("WCLogs instance successful")
+			response = "Congrats, API credentials are valid"
+			err := storeWCLogsCredentials(i.GuildID, creds)
+			if err != nil {
+				response = "API credentials are valid, but I failed to store them"
+			}
+		}
+
+		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: response,
+				Flags:   uint64(discordgo.MessageFlagsEphemeral),
 			},
 		})
 	},
