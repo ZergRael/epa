@@ -31,10 +31,23 @@ type Credentials struct {
 	ClientSecret string `json:"client_secret"`
 }
 
+type Ranking struct {
+	Encounter struct {
+		ID   int
+		Name string
+	}
+	RankPercent float32
+}
+
+type ZoneRankings struct {
+	Partition int
+	Rankings  []Ranking
+}
+
 type rateLimit struct {
 	RateLimitData struct {
 		LimitPerHour        int
-		PointsSpentThisHour int
+		PointsSpentThisHour float32
 		PointsResetIn       int
 	}
 }
@@ -70,10 +83,72 @@ func (w *WCLogs) Check() bool {
 	var resp rateLimit
 
 	if err := w.client.Run(context.Background(), req, &resp); err != nil {
+		log.Error().Err(err).Msg("Check failed")
 		return false
 	}
 
 	log.Debug().Interface("rateLimitData", resp.RateLimitData).Msg("WCLogs checked")
 
 	return true
+}
+
+func (w *WCLogs) GetCharacterID(char, server, region string) (int, error) {
+	req := graphql.NewRequest(`
+    query ($name: String!, $server: String!, $region: String!) {
+		characterData {
+			character(name: $name, serverSlug: $server, serverRegion: $region) {
+				id
+			}
+		}
+    }
+`)
+
+	req.Var("name", char)
+	req.Var("server", server)
+	req.Var("region", region)
+
+	var resp struct {
+		CharacterData struct {
+			Character struct {
+				ID int
+			}
+		}
+	}
+
+	if err := w.client.Run(context.Background(), req, &resp); err != nil {
+		return 0, err
+	}
+
+	return resp.CharacterData.Character.ID, nil
+}
+
+// TODO: check hps and dps metrics ?
+func (w *WCLogs) CheckParsesForCharacter(id int) (interface{}, error) {
+	req := graphql.NewRequest(`
+    query ($id: Int!) {
+		characterData {
+			character(id: $id) {
+				zoneRankings(metric: hps)
+			}
+		}
+    }
+`)
+
+	req.Var("id", id)
+
+	var resp struct {
+		CharacterData struct {
+			Character struct {
+				ZoneRankings ZoneRankings
+			}
+		}
+	}
+
+	if err := w.client.Run(context.Background(), req, &resp); err != nil {
+		return nil, err
+	}
+
+	log.Info().Interface("parses", resp).Msg("Parses")
+
+	return resp.CharacterData.Character.ZoneRankings, nil
 }

@@ -155,3 +155,30 @@ func storeWCLogsCredentials(guildID string, creds *wclogs.Credentials) error {
 
 	return nil
 }
+
+func trackWCLogsCharacter(guildID string, charID int) {
+	_, err := logs[guildID].CheckParsesForCharacter(charID)
+	if err != nil {
+		return
+	}
+
+	// TODO: store parses
+	// TODO: set regular check timer
+
+	//err = db.Update(func(tx *buntdb.Tx) error {
+	//
+	//	val, err := tx.Get("warcraft-logs-characters-" + guildID)
+	//	if err == nil {
+	//
+	//	}
+	//
+	//	_, _, err := tx.Set("warcraft-logs-characters-"+guildID, string(bytes), nil)
+	//	if err != nil {
+	//		return err
+	//	}
+	//	return nil
+	//})
+	//if err != nil {
+	//	return err
+	//}
+}

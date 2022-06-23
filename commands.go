@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/bwmarrin/discordgo"
 	"github.com/rs/zerolog/log"
+	"strconv"
 )
 
 var falsePointer = false
@@ -51,6 +52,30 @@ var commands = []*discordgo.ApplicationCommand{
 			},
 		},
 	},
+	{
+		Name:        "track-character",
+		Description: "Add WCLogs parses tracking on a specific character",
+		Options: []*discordgo.ApplicationCommandOption{
+			{
+				Type:        discordgo.ApplicationCommandOptionString,
+				Name:        "character",
+				Description: "Character name",
+				Required:    true,
+			},
+			{
+				Type:        discordgo.ApplicationCommandOptionString,
+				Name:        "server",
+				Description: "Character server",
+				Required:    true,
+			},
+			{
+				Type:        discordgo.ApplicationCommandOptionString,
+				Name:        "region",
+				Description: "Character server region (EU/US)",
+				Required:    true,
+			},
+		},
+	},
 }
 
 var commandsHandlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate){
@@ -77,6 +102,30 @@ var commandsHandlers = map[string]func(s *discordgo.Session, i *discordgo.Intera
 			err := storeWCLogsCredentials(i.GuildID, creds)
 			if err != nil {
 				response = "API credentials are valid, but I failed to store them"
+			}
+		}
+
+		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: response,
+				Flags:   uint64(discordgo.MessageFlagsEphemeral),
+			},
+		})
+	},
+
+	"track-character": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+		char := i.ApplicationCommandData().Options[0].StringValue()
+		server := i.ApplicationCommandData().Options[1].StringValue()
+		region := i.ApplicationCommandData().Options[2].StringValue()
+
+		response := "Missing WarcraftLogs credentials setup"
+		if logs[i.GuildID] != nil {
+			response = "Failed to track " + char + "-" + server + "[" + region + "]"
+			id, err := logs[i.GuildID].GetCharacterID(char, server, region)
+			if err == nil {
+				response = char + "-" + server + "[" + region + "] (" + strconv.Itoa(id) + ") is now tracked"
+				trackWCLogsCharacter(i.GuildID, id)
 			}
 		}
 
