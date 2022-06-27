@@ -32,6 +32,11 @@ type Credentials struct {
 	ClientSecret string `json:"client_secret"`
 }
 
+type Zone struct {
+	ID   int
+	Name string
+}
+
 type Ranking struct {
 	Encounter struct {
 		ID   int
@@ -121,6 +126,32 @@ func (w *WCLogs) GetCharacterID(char, server, region string) (int, error) {
 	}
 
 	return resp.CharacterData.Character.ID, nil
+}
+
+func (w *WCLogs) getZones() ([]Zone, error) {
+	req := graphql.NewRequest(`
+    query ($expansion: Int!) {
+		worldData {
+			zones (expansion_id: $expansion) {
+				id
+				name
+			}
+		}
+    }
+`)
+	req.Var("expansion", classicExpansionID)
+
+	var resp struct {
+		WorldData struct {
+			Zones []Zone
+		}
+	}
+
+	if err := w.client.Run(context.Background(), req, &resp); err != nil {
+		return nil, err
+	}
+
+	return resp.WorldData.Zones, nil
 }
 
 // TODO: check hps and dps metrics ?
