@@ -17,10 +17,11 @@ import (
 //https://www.warcraftlogs.com/v2-api-docs/warcraft/user.doc.html
 
 const (
-	authorizationUri = "https://www.warcraftlogs.com/oauth/authorize"
-	tokenUri         = "https://www.warcraftlogs.com/oauth/token"
-	retailApiUri     = "https://www.warcraftlogs.com/api/v2/client"
-	classicApiUri    = "https://classic.warcraftlogs.com/api/v2/client"
+	authorizationUri   = "https://www.warcraftlogs.com/oauth/authorize"
+	tokenUri           = "https://www.warcraftlogs.com/oauth/token"
+	retailApiUri       = "https://www.warcraftlogs.com/api/v2/client"
+	classicApiUri      = "https://classic.warcraftlogs.com/api/v2/client"
+	classicExpansionID = 1001
 )
 
 type WCLogs struct {
@@ -154,13 +155,12 @@ func (w *WCLogs) getZones() ([]Zone, error) {
 	return resp.WorldData.Zones, nil
 }
 
-// TODO: check hps and dps metrics ?
-func (w *WCLogs) CheckParsesForCharacter(id int) (interface{}, error) {
+func (w *WCLogs) CheckCurrentParsesForCharacter(id int) (map[string]ZoneRankings, error) {
 	req := graphql.NewRequest(`
-    query ($id: Int!) {
+    query ($id: Int!, $metric: CharacterRankingMetricType!) {
 		characterData {
 			character(id: $id) {
-				zoneRankings(metric: hps)
+				zoneRankings(metric: $metric)
 			}
 		}
     }
@@ -168,19 +168,27 @@ func (w *WCLogs) CheckParsesForCharacter(id int) (interface{}, error) {
 
 	req.Var("id", id)
 
-	var resp struct {
-		CharacterData struct {
-			Character struct {
-				ZoneRankings ZoneRankings
+	parses := make(map[string]ZoneRankings)
+
+	metrics := []string{"hps", "dps"}
+
+	for _, metric := range metrics {
+		req.Var("metric", metric)
+
+		var resp struct {
+			CharacterData struct {
+				Character struct {
+					ZoneRankings ZoneRankings
+				}
 			}
 		}
+
+		if err := w.client.Run(context.Background(), req, &resp); err != nil {
+			return nil, err
+		}
+
+		parses[metric] = resp.CharacterData.Character.ZoneRankings
 	}
 
-	if err := w.client.Run(context.Background(), req, &resp); err != nil {
-		return nil, err
-	}
-
-	log.Info().Interface("parses", resp).Msg("Parses")
-
-	return resp.CharacterData.Character.ZoneRankings, nil
+	return parses, nil
 }
