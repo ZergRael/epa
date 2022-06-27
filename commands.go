@@ -3,9 +3,10 @@ package main
 import (
 	"epa/wclogs"
 	"fmt"
+	"strconv"
+
 	"github.com/bwmarrin/discordgo"
 	"github.com/rs/zerolog/log"
-	"strconv"
 )
 
 var falsePointer = false

@@ -2,6 +2,7 @@ package wclogs
 
 import (
 	"context"
+
 	"github.com/machinebox/graphql"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/oauth2"

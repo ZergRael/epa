@@ -4,12 +4,12 @@ import (
 	"encoding/json"
 	"epa/wclogs"
 	"flag"
-	"github.com/rs/zerolog"
 	"os"
 	"os/signal"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/tidwall/buntdb"
 )

@@ -2,11 +2,12 @@ package main
 
 import (
 	"fmt"
-	"github.com/bwmarrin/discordgo"
-	"github.com/rs/zerolog/log"
 	"regexp"
 	"strconv"
 	"time"
+
+	"github.com/bwmarrin/discordgo"
+	"github.com/rs/zerolog/log"
 )
 
 func ready(s *discordgo.Session, ready *discordgo.Ready) {
