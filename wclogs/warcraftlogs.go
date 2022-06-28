@@ -51,6 +51,11 @@ type ZoneRankings struct {
 	Rankings  []Ranking
 }
 
+type Report struct {
+	Code    string
+	EndTime float32
+}
+
 type rateLimit struct {
 	RateLimitData struct {
 		LimitPerHour        int
@@ -155,7 +160,7 @@ func (w *WCLogs) getZones() ([]Zone, error) {
 	return resp.WorldData.Zones, nil
 }
 
-func (w *WCLogs) CheckCurrentParsesForCharacter(id int) (map[string]ZoneRankings, error) {
+func (w *WCLogs) GetCurrentParsesForCharacter(charID int) (map[string]ZoneRankings, error) {
 	req := graphql.NewRequest(`
     query ($id: Int!, $metric: CharacterRankingMetricType!) {
 		characterData {
@@ -166,7 +171,7 @@ func (w *WCLogs) CheckCurrentParsesForCharacter(id int) (map[string]ZoneRankings
     }
 `)
 
-	req.Var("id", id)
+	req.Var("id", charID)
 
 	parses := make(map[string]ZoneRankings)
 
@@ -191,4 +196,39 @@ func (w *WCLogs) CheckCurrentParsesForCharacter(id int) (map[string]ZoneRankings
 	}
 
 	return parses, nil
+}
+
+func (w *WCLogs) GetLatestReportMetadata(charID int) (*Report, error) {
+	req := graphql.NewRequest(`
+    query ($id: Int!) {
+		characterData {
+			character(id: $id) {
+				recentReports(limit: 1) {
+					data {
+						endTime
+						code
+					}
+				}
+			}
+		}
+    }
+`)
+
+	req.Var("id", charID)
+
+	var resp struct {
+		CharacterData struct {
+			Character struct {
+				RecentReports struct {
+					Data []Report
+				}
+			}
+		}
+	}
+
+	if err := w.client.Run(context.Background(), req, &resp); err != nil {
+		return nil, err
+	}
+
+	return &resp.CharacterData.Character.RecentReports.Data[0], nil
 }
