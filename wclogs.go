@@ -3,11 +3,16 @@ package main
 import (
 	"epa/wclogs"
 	"strconv"
+	"time"
 
 	"github.com/rs/zerolog/log"
 )
 
 var trackedCharacters map[string][]int
+var characterTrackTicker map[string]*time.Ticker
+var timerStopper map[string]chan bool
+
+const characterTrackTickerDuration = time.Minute
 
 func instantiateWCLogsForGuild(guildID string) {
 	// WCLogs credentials
@@ -38,6 +43,22 @@ func instantiateWCLogsForGuild(guildID string) {
 		log.Warn().Err(err).Msg("No currently tracked characters")
 		trackedCharacters[guildID] = make([]int, 0)
 	}
+
+	// Setup tracking timer
+	setupWCLogsTicker(guildID)
+}
+
+func destroyWCLogsForGuild(guildID string) {
+	// Remove tracking timer
+	if characterTrackTicker[guildID] != nil {
+		characterTrackTicker[guildID].Stop()
+	}
+	if timerStopper[guildID] != nil {
+		timerStopper[guildID] <- true
+	}
+
+	trackedCharacters[guildID] = nil
+	logs[guildID] = nil
 }
 
 func handleRegisterWarcraftLogs(clientID, clientSecret, guildID string) string {
@@ -53,13 +74,22 @@ func handleRegisterWarcraftLogs(clientID, clientSecret, guildID string) string {
 	if trackedCharacters == nil {
 		trackedCharacters = make(map[string][]int)
 	}
-	trackedCharacters[guildID] = make([]int, 0)
+	var err error
+	trackedCharacters[guildID], err = fetchWCLogsTrackedCharacters(db, guildID)
+	if err != nil {
+		log.Warn().Err(err).Msg("No currently tracked characters")
+		trackedCharacters[guildID] = make([]int, 0)
+	}
+
 	log.Info().Str("guildID", guildID).Msg("WCLogs instance successful")
-	err := storeWCLogsCredentials(db, guildID, creds)
+	err = storeWCLogsCredentials(db, guildID, creds)
 	if err != nil {
 		log.Error().Str("guildID", guildID).Err(err).Msg("storeWCLogsCredentials failed")
 		return "API credentials are valid, but I failed to store them"
 	}
+
+	// Setup tracking timer
+	setupWCLogsTicker(guildID)
 
 	return "Congrats, API credentials are valid"
 }
@@ -106,7 +136,6 @@ func handleTrackCharacter(name, server, region, guildID string) string {
 	return charSlug + " is now tracked"
 }
 
-// TODO: Run on timer
 func checkWCLogsForCharacterUpdates(guildID string, charID int) error {
 	dbReport, err := fetchWCLogsLatestReportForCharacter(db, charID)
 	if err != nil {
@@ -119,9 +148,35 @@ func checkWCLogsForCharacterUpdates(guildID string, charID int) error {
 	}
 
 	if report.EndTime == dbReport.EndTime {
+		log.Debug().Msg("checkWCLogsForCharacterUpdates : no latest report changes")
 		return nil
 	}
 
 	// Get parses and diff them
 	return nil
+}
+
+func setupWCLogsTicker(guildID string) {
+	if characterTrackTicker == nil {
+		characterTrackTicker = make(map[string]*time.Ticker)
+	}
+	if timerStopper == nil {
+		timerStopper = make(map[string]chan bool)
+	}
+	characterTrackTicker[guildID] = time.NewTicker(characterTrackTickerDuration)
+	timerStopper[guildID] = make(chan bool)
+
+	for {
+		select {
+		case <-timerStopper[guildID]:
+			return
+		case <-characterTrackTicker[guildID].C:
+			for _, charID := range trackedCharacters[guildID] {
+				err := checkWCLogsForCharacterUpdates(guildID, charID)
+				if err != nil {
+					log.Error().Err(err).Msg("checkWCLogsForCharacterUpdates")
+				}
+			}
+		}
+	}
 }

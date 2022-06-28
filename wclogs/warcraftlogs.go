@@ -10,10 +10,6 @@ import (
 	"golang.org/x/oauth2/clientcredentials"
 )
 
-// Register playername
-// Regular pull from GraphQL
-// Emote on new parse
-
 //https://www.warcraftlogs.com/api/docs
 //https://www.warcraftlogs.com/v2-api-docs/warcraft/user.doc.html
 

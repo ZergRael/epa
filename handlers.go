@@ -33,6 +33,8 @@ func guildCreate(_ *discordgo.Session, guild *discordgo.GuildCreate) {
 func guildDelete(_ *discordgo.Session, guild *discordgo.GuildDelete) {
 	log.Info().Str("guildID", guild.ID).Msg("Removed from guild")
 	// Not necessary to remove commands here, we have already lost permissions
+
+	destroyWCLogsForGuild(guild.ID)
 }
 
 func discordMessageHandler(s *discordgo.Session, m *discordgo.MessageCreate) {

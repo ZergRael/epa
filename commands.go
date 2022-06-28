@@ -102,6 +102,8 @@ var commandsHandlers = map[string]func(s *discordgo.Session, i *discordgo.Intera
 		})
 	},
 
+	// TODO: Add unregister-warcraftlogs command
+
 	"track-character": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		char := i.ApplicationCommandData().Options[0].StringValue()
 		server := i.ApplicationCommandData().Options[1].StringValue()
@@ -117,6 +119,8 @@ var commandsHandlers = map[string]func(s *discordgo.Session, i *discordgo.Intera
 			},
 		})
 	},
+
+	// TODO: Add untrack-character command
 
 	"reminder": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		remindAt := parseTime(i.ApplicationCommandData().Options[0].StringValue())
