@@ -72,7 +72,7 @@ func addReminder(reason string, t *time.Time, diffMinutes int, channelID string)
 	}
 
 	at := t.Add(time.Duration(-diffMinutes) * time.Minute)
-	in := at.Sub(time.Now())
+	in := time.Until(at)
 	if in < 0 {
 		_, err := s.ChannelMessageSend(channelID, "Cannot set a reminder in the past")
 		if err != nil {

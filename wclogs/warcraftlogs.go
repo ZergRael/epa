@@ -2,6 +2,7 @@ package wclogs
 
 import (
 	"context"
+	"errors"
 
 	"github.com/machinebox/graphql"
 	"github.com/rs/zerolog/log"
@@ -228,6 +229,10 @@ func (w *WCLogs) GetLatestReportMetadata(charID int) (*Report, error) {
 
 	if err := w.client.Run(context.Background(), req, &resp); err != nil {
 		return nil, err
+	}
+
+	if len(resp.CharacterData.Character.RecentReports.Data) < 1 {
+		return nil, errors.New("no recent report")
 	}
 
 	return &resp.CharacterData.Character.RecentReports.Data[0], nil

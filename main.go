@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"epa/wclogs"
 	"flag"
 	"os"
@@ -101,84 +100,4 @@ func main() {
 	}
 
 	log.Info().Msg("Graceful shutdown")
-}
-
-func instantiateWCLogsForGuild(guildID string) {
-	// WCLogs credentials
-	creds := &wclogs.Credentials{}
-	err := db.View(func(tx *buntdb.Tx) error {
-		val, err := tx.Get("warcraft-logs-" + guildID)
-		if err != nil {
-			return err
-		}
-
-		err = json.Unmarshal([]byte(val), creds)
-		if err != nil {
-			return err
-		}
-
-		return nil
-	})
-	if err != nil {
-		log.Debug().Err(err).Str("guildID", guildID).Msg("Cannot read WCLogs credentials for guild")
-	}
-
-	// Check WCLogs credentials
-	if creds.ClientID != "" && creds.ClientSecret != "" {
-		w := wclogs.NewWCLogs(creds)
-		if w.Check() {
-			log.Info().Str("guildID", guildID).Msg("WCLogs instance successful")
-			logs[guildID] = w
-			return
-		}
-	}
-
-	log.Warn().Str("guildID", guildID).Msg("Failed to reuse credentials for guild")
-}
-
-func storeWCLogsCredentials(guildID string, creds *wclogs.Credentials) error {
-	bytes, err := json.Marshal(creds)
-	if err != nil {
-		return err
-	}
-
-	err = db.Update(func(tx *buntdb.Tx) error {
-		_, _, err := tx.Set("warcraft-logs-"+guildID, string(bytes), nil)
-		if err != nil {
-			return err
-		}
-		return nil
-	})
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func trackWCLogsCharacter(guildID string, charID int) {
-	_, err := logs[guildID].CheckParsesForCharacter(charID)
-	if err != nil {
-		return
-	}
-
-	// TODO: store parses
-	// TODO: set regular check timer
-
-	//err = db.Update(func(tx *buntdb.Tx) error {
-	//
-	//	val, err := tx.Get("warcraft-logs-characters-" + guildID)
-	//	if err == nil {
-	//
-	//	}
-	//
-	//	_, _, err := tx.Set("warcraft-logs-characters-"+guildID, string(bytes), nil)
-	//	if err != nil {
-	//		return err
-	//	}
-	//	return nil
-	//})
-	//if err != nil {
-	//	return err
-	//}
 }

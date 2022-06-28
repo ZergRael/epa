@@ -1,9 +1,7 @@
 package main
 
 import (
-	"epa/wclogs"
 	"fmt"
-	"strconv"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/rs/zerolog/log"
@@ -93,18 +91,7 @@ var commandsHandlers = map[string]func(s *discordgo.Session, i *discordgo.Intera
 		clientID := i.ApplicationCommandData().Options[0].StringValue()
 		clientSecret := i.ApplicationCommandData().Options[1].StringValue()
 
-		creds := &wclogs.Credentials{ClientID: clientID, ClientSecret: clientSecret}
-		w := wclogs.NewWCLogs(creds)
-		response := "These API credentials cannot be used"
-		if w.Check() {
-			logs[i.GuildID] = w
-			log.Info().Str("guildID", i.GuildID).Msg("WCLogs instance successful")
-			response = "Congrats, API credentials are valid"
-			err := storeWCLogsCredentials(i.GuildID, creds)
-			if err != nil {
-				response = "API credentials are valid, but I failed to store them"
-			}
-		}
+		response := handleRegisterWarcraftLogs(clientID, clientSecret, i.GuildID)
 
 		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
@@ -120,15 +107,7 @@ var commandsHandlers = map[string]func(s *discordgo.Session, i *discordgo.Intera
 		server := i.ApplicationCommandData().Options[1].StringValue()
 		region := i.ApplicationCommandData().Options[2].StringValue()
 
-		response := "Missing WarcraftLogs credentials setup"
-		if logs[i.GuildID] != nil {
-			response = "Failed to track " + char + "-" + server + "[" + region + "]"
-			id, err := logs[i.GuildID].GetCharacterID(char, server, region)
-			if err == nil {
-				response = char + "-" + server + "[" + region + "] (" + strconv.Itoa(id) + ") is now tracked"
-				trackWCLogsCharacter(i.GuildID, id)
-			}
-		}
+		response := handleTrackCharacter(char, server, region, i.GuildID)
 
 		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
