@@ -48,6 +48,10 @@ type ZoneRankings struct {
 	Rankings  []Ranking
 }
 
+type Parses map[string]ZoneRankings
+
+var ParsesMetrics = []string{"hps", "dps"}
+
 type Report struct {
 	Code    string
 	EndTime float32
@@ -157,7 +161,7 @@ func (w *WCLogs) getZones() ([]Zone, error) {
 	return resp.WorldData.Zones, nil
 }
 
-func (w *WCLogs) GetCurrentParsesForCharacter(charID int) (map[string]ZoneRankings, error) {
+func (w *WCLogs) GetCurrentParsesForCharacter(charID int) (*Parses, error) {
 	req := graphql.NewRequest(`
     query ($id: Int!, $metric: CharacterRankingMetricType!) {
 		characterData {
@@ -170,11 +174,9 @@ func (w *WCLogs) GetCurrentParsesForCharacter(charID int) (map[string]ZoneRankin
 
 	req.Var("id", charID)
 
-	parses := make(map[string]ZoneRankings)
+	parses := make(Parses)
 
-	metrics := []string{"hps", "dps"}
-
-	for _, metric := range metrics {
+	for _, metric := range ParsesMetrics {
 		req.Var("metric", metric)
 
 		var resp struct {
@@ -192,7 +194,7 @@ func (w *WCLogs) GetCurrentParsesForCharacter(charID int) (map[string]ZoneRankin
 		parses[metric] = resp.CharacterData.Character.ZoneRankings
 	}
 
-	return parses, nil
+	return &parses, nil
 }
 
 func (w *WCLogs) GetLatestReportMetadata(charID int) (*Report, error) {

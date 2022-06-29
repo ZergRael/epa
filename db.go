@@ -103,3 +103,35 @@ func storeWCLogsTrackedCharacters(db *buntdb.DB, guildID string, characters []in
 
 	return err
 }
+
+func fetchWCLogsParsesForCharacter(db *buntdb.DB, charID int) (*wclogs.Parses, error) {
+	parses := &wclogs.Parses{}
+	err := db.View(func(tx *buntdb.Tx) error {
+		val, err := tx.Get("wclogs-parses-" + strconv.Itoa(charID))
+		if err != nil {
+			return err
+		}
+
+		return json.Unmarshal([]byte(val), parses)
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return parses, nil
+}
+
+func storeWCLogsParsesForCharacter(db *buntdb.DB, charID int, parses *wclogs.Parses) error {
+	bytes, err := json.Marshal(parses)
+	if err != nil {
+		return err
+	}
+
+	err = db.Update(func(tx *buntdb.Tx) error {
+		_, _, err := tx.Set("wclogs-parses-"+strconv.Itoa(charID), string(bytes), nil)
+		return err
+	})
+
+	return err
+}
