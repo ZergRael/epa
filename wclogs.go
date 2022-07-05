@@ -216,6 +216,12 @@ func checkWCLogsForCharacterUpdates(guildID string, charID int) error {
 		Float32("endTime", report.EndTime).Float32("dbEndTime", dbReport.EndTime).
 		Msg("checkWCLogsForCharacterUpdates : latest report changes")
 
+	// Store metadata now, too bad if we err later
+	err = storeWCLogsLatestReportForCharacter(db, charID, report)
+	if err != nil {
+		return err
+	}
+
 	parses, err := logs[guildID].GetCurrentParsesForCharacter(charID)
 	if err != nil {
 		return err
@@ -250,6 +256,8 @@ func setupWCLogsTicker(guildID string) {
 	}
 	characterTrackTicker[guildID] = time.NewTicker(characterTrackTickerDuration)
 	timerStopper[guildID] = make(chan bool)
+
+	log.Info().Str("guildID", guildID).Msg("Started ticker")
 
 	for {
 		select {
