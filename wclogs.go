@@ -94,6 +94,16 @@ func handleRegisterWarcraftLogs(clientID, clientSecret, guildID string) string {
 	return "Congrats, API credentials are valid"
 }
 
+func handleUnregisterWarcraftLogs(guildID string) string {
+	if logs[guildID] == nil {
+		return "No stored credentials"
+	}
+
+	destroyWCLogsForGuild(guildID)
+
+	return "Unregister successful"
+}
+
 func handleTrackCharacter(name, server, region, guildID string) string {
 	if logs[guildID] == nil {
 		return "Missing WarcraftLogs credentials setup"
@@ -137,6 +147,31 @@ func handleTrackCharacter(name, server, region, guildID string) string {
 	// Parses will be recorded on next check ticker
 
 	return charSlug + " is now tracked"
+}
+
+func handleUntrackCharacter(name, server, region, guildID string) string {
+	if logs[guildID] == nil {
+		return "Missing WarcraftLogs credentials setup"
+	}
+
+	charSlug := name + "-" + server + "[" + region + "]"
+	charID, err := logs[guildID].GetCharacterID(name, server, region)
+	if err != nil {
+		log.Error().Str("slug", charSlug).Err(err).Msg("GetCharacterID failed")
+		return "Failed to untrack " + charSlug + " : character not found !"
+	}
+
+	charSlug += " (" + strconv.Itoa(charID) + ")"
+	for idx, id := range trackedCharacters[guildID] {
+		if id == charID {
+			trackedCharacters[guildID] = append(trackedCharacters[guildID][:idx], trackedCharacters[guildID][idx+1:]...)
+			log.Debug().Str("slug", charSlug).Err(err).Msg("Untracked")
+			return charSlug + " is already tracked"
+		}
+	}
+
+	log.Warn().Str("slug", charSlug).Err(err).Msg("Not tracked")
+	return charSlug + " is not tracked"
 }
 
 func checkWCLogsForCharacterUpdates(guildID string, charID int) error {

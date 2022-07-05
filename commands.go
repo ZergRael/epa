@@ -52,8 +52,37 @@ var commands = []*discordgo.ApplicationCommand{
 		},
 	},
 	{
+		Name:              "unregister-warcraftlogs",
+		Description:       "Erase WarcraftLogs API credentials",
+		DefaultPermission: &falsePointer,
+	},
+	{
 		Name:        "track-character",
 		Description: "Add WCLogs parses tracking on a specific character",
+		Options: []*discordgo.ApplicationCommandOption{
+			{
+				Type:        discordgo.ApplicationCommandOptionString,
+				Name:        "character",
+				Description: "Character name",
+				Required:    true,
+			},
+			{
+				Type:        discordgo.ApplicationCommandOptionString,
+				Name:        "server",
+				Description: "Character server",
+				Required:    true,
+			},
+			{
+				Type:        discordgo.ApplicationCommandOptionString,
+				Name:        "region",
+				Description: "Character server region (EU/US)",
+				Required:    true,
+			},
+		},
+	},
+	{
+		Name:        "untrack-character",
+		Description: "Remove WCLogs parses tracking on a specific character",
 		Options: []*discordgo.ApplicationCommandOption{
 			{
 				Type:        discordgo.ApplicationCommandOptionString,
@@ -101,8 +130,17 @@ var commandsHandlers = map[string]func(s *discordgo.Session, i *discordgo.Intera
 			},
 		})
 	},
+	"unregister-warcraftlogs": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+		response := handleUnregisterWarcraftLogs(i.GuildID)
 
-	// TODO: Add unregister-warcraftlogs command
+		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: response,
+				Flags:   uint64(discordgo.MessageFlagsEphemeral),
+			},
+		})
+	},
 
 	"track-character": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		char := i.ApplicationCommandData().Options[0].StringValue()
@@ -119,8 +157,21 @@ var commandsHandlers = map[string]func(s *discordgo.Session, i *discordgo.Intera
 			},
 		})
 	},
+	"untrack-character": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+		char := i.ApplicationCommandData().Options[0].StringValue()
+		server := i.ApplicationCommandData().Options[1].StringValue()
+		region := i.ApplicationCommandData().Options[2].StringValue()
 
-	// TODO: Add untrack-character command
+		response := handleUntrackCharacter(char, server, region, i.GuildID)
+
+		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: response,
+				Flags:   uint64(discordgo.MessageFlagsEphemeral),
+			},
+		})
+	},
 
 	"reminder": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		remindAt := parseTime(i.ApplicationCommandData().Options[0].StringValue())
