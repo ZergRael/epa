@@ -1,7 +1,6 @@
 package main
 
 import (
-	"epa/wclogs"
 	"flag"
 	"os"
 	"os/signal"
@@ -11,6 +10,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/tidwall/buntdb"
+	"github.com/zergrael/epa/wclogs"
 )
 
 // Application flags

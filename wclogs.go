@@ -1,13 +1,13 @@
 package main
 
 import (
-	"epa/wclogs"
 	"fmt"
 	"math/rand"
 	"strconv"
 	"time"
 
 	"github.com/rs/zerolog/log"
+	"github.com/zergrael/epa/wclogs"
 )
 
 var trackedCharacters map[string]*[]TrackedCharacter

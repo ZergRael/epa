@@ -2,10 +2,10 @@ package main
 
 import (
 	"encoding/json"
-	"epa/wclogs"
 	"strconv"
 
 	"github.com/tidwall/buntdb"
+	"github.com/zergrael/epa/wclogs"
 )
 
 func fetchWCLogsCredentials(db *buntdb.DB, guildID string) (*wclogs.Credentials, error) {
