@@ -14,7 +14,7 @@ var trackedCharacters map[string]*[]TrackedCharacter
 var characterTrackTicker map[string]*time.Ticker
 var timerStopper map[string]chan bool
 
-const characterTrackTickerDuration = time.Minute
+const characterTrackTickerDuration = 2 * time.Minute
 
 type TrackedCharacter struct {
 	CharID    int
