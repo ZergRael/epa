@@ -2,22 +2,37 @@ package main
 
 import (
 	"epa/wclogs"
+	"fmt"
+	"math/rand"
 	"strconv"
 	"time"
 
 	"github.com/rs/zerolog/log"
 )
 
-var trackedCharacters map[string][]int
+var trackedCharacters map[string]*[]TrackedCharacter
 var characterTrackTicker map[string]*time.Ticker
 var timerStopper map[string]chan bool
 
 const characterTrackTickerDuration = time.Minute
 
+type TrackedCharacter struct {
+	CharID    int
+	Slug      string
+	ChannelID string
+}
+
+var winEmojis = []string{
+	":partying_face:",
+	":muscle:",
+	":bangbang:",
+	":chart_with_upwards_trend:",
+}
+
 func instantiateWCLogsForGuild(guildID string) {
 	// WCLogs credentials
 	creds, err := fetchWCLogsCredentials(db, guildID)
-	if err != nil {
+	if err != nil || creds == nil {
 		log.Debug().Err(err).Str("guildID", guildID).Msg("Cannot read WCLogs credentials for guild")
 	}
 
@@ -36,12 +51,13 @@ func instantiateWCLogsForGuild(guildID string) {
 	logs[guildID] = w
 
 	if trackedCharacters == nil {
-		trackedCharacters = make(map[string][]int)
+		trackedCharacters = make(map[string]*[]TrackedCharacter)
 	}
 	trackedCharacters[guildID], err = fetchWCLogsTrackedCharacters(db, guildID)
 	if err != nil {
 		log.Warn().Err(err).Msg("No currently tracked characters")
-		trackedCharacters[guildID] = make([]int, 0)
+		characters := make([]TrackedCharacter, 0)
+		trackedCharacters[guildID] = &characters
 	}
 
 	// Setup tracking timer
@@ -72,13 +88,14 @@ func handleRegisterWarcraftLogs(clientID, clientSecret, guildID string) string {
 	logs[guildID] = w
 
 	if trackedCharacters == nil {
-		trackedCharacters = make(map[string][]int)
+		trackedCharacters = make(map[string]*[]TrackedCharacter)
 	}
 	var err error
 	trackedCharacters[guildID], err = fetchWCLogsTrackedCharacters(db, guildID)
 	if err != nil {
 		log.Warn().Err(err).Msg("No currently tracked characters")
-		trackedCharacters[guildID] = make([]int, 0)
+		characters := make([]TrackedCharacter, 0)
+		trackedCharacters[guildID] = &characters
 	}
 
 	log.Info().Str("guildID", guildID).Msg("WCLogs instance successful")
@@ -104,42 +121,45 @@ func handleUnregisterWarcraftLogs(guildID string) string {
 	return "Unregister successful"
 }
 
-func handleTrackCharacter(name, server, region, guildID string) string {
+func handleTrackCharacter(name, server, region, guildID, channelID string) string {
 	if logs[guildID] == nil {
 		return "Missing WarcraftLogs credentials setup"
 	}
 
 	charSlug := name + "-" + server + "[" + region + "]"
 	charID, err := logs[guildID].GetCharacterID(name, server, region)
-	if err != nil {
+	if err != nil || charID == 0 {
 		log.Error().Str("slug", charSlug).Err(err).Msg("GetCharacterID failed")
 		return "Failed to track " + charSlug + " : character not found !"
 	}
 
-	charSlug += " (" + strconv.Itoa(charID) + ")"
-	for _, id := range trackedCharacters[guildID] {
-		if id == charID {
-			log.Warn().Str("slug", charSlug).Err(err).Msg("Already tracked")
+	for _, char := range *trackedCharacters[guildID] {
+		if char.CharID == charID {
+			log.Warn().Str("slug", charSlug).Int("charID", charID).Err(err).Msg("Already tracked")
 			return charSlug + " is already tracked"
 		}
 	}
 
 	reportMetadata, err := logs[guildID].GetLatestReportMetadata(charID)
 	if err != nil {
-		log.Error().Str("slug", charSlug).Err(err).Msg("GetLatestReportMetadata failed")
+		log.Error().Str("slug", charSlug).Int("charID", charID).
+			Err(err).Msg("GetLatestReportMetadata failed")
 		return "Failed to track " + charSlug + " : no recent report"
 	}
 
 	err = storeWCLogsLatestReportForCharacter(db, charID, reportMetadata)
 	if err != nil {
-		log.Error().Str("slug", charSlug).Err(err).Msg("storeWCLogsLatestReportForCharacter failed")
+		log.Error().Str("slug", charSlug).Int("charID", charID).
+			Err(err).Msg("storeWCLogsLatestReportForCharacter failed")
 		return "Failed to track " + charSlug
 	}
 
-	trackedCharacters[guildID] = append(trackedCharacters[guildID], charID)
+	char := TrackedCharacter{CharID: charID, ChannelID: channelID, Slug: charSlug}
+	*trackedCharacters[guildID] = append(*trackedCharacters[guildID], char)
 	err = storeWCLogsTrackedCharacters(db, guildID, trackedCharacters[guildID])
 	if err != nil {
-		log.Error().Str("slug", charSlug).Err(err).Msg("storeWCLogsTrackedCharacters failed")
+		log.Error().Str("slug", charSlug).Int("charID", charID).
+			Err(err).Msg("storeWCLogsTrackedCharacters failed")
 		return "Failed to track " + charSlug
 	}
 
@@ -162,9 +182,9 @@ func handleUntrackCharacter(name, server, region, guildID string) string {
 	}
 
 	charSlug += " (" + strconv.Itoa(charID) + ")"
-	for idx, id := range trackedCharacters[guildID] {
-		if id == charID {
-			trackedCharacters[guildID] = append(trackedCharacters[guildID][:idx], trackedCharacters[guildID][idx+1:]...)
+	for idx, char := range *trackedCharacters[guildID] {
+		if char.CharID == charID {
+			*trackedCharacters[guildID] = append((*trackedCharacters[guildID])[:idx], (*trackedCharacters[guildID])[idx+1:]...)
 			log.Debug().Str("slug", charSlug).Err(err).Msg("Untracked")
 			return charSlug + " is already tracked"
 		}
@@ -174,8 +194,8 @@ func handleUntrackCharacter(name, server, region, guildID string) string {
 	return charSlug + " is not tracked"
 }
 
-func checkWCLogsForCharacterUpdates(guildID string, charID int) error {
-	dbReport, err := fetchWCLogsLatestReportForCharacter(db, charID)
+func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) error {
+	dbReport, err := fetchWCLogsLatestReportForCharacter(db, char.CharID)
 	if err != nil {
 		// Missing latest report
 		// Since we should have recorded at least one on track
@@ -183,22 +203,22 @@ func checkWCLogsForCharacterUpdates(guildID string, charID int) error {
 		return err
 	}
 
-	report, err := logs[guildID].GetLatestReportMetadata(charID)
+	report, err := logs[guildID].GetLatestReportMetadata(char.CharID)
 	if err != nil {
 		return err
 	}
 
-	dbParses, err := fetchWCLogsParsesForCharacter(db, charID)
+	dbParses, err := fetchWCLogsParsesForCharacter(db, char.CharID)
 	if err != nil {
-		log.Debug().Int("charID", charID).Msg("fetchWCLogsParsesForCharacter : missing parses")
+		log.Debug().Int("charID", char.CharID).Msg("fetchWCLogsParsesForCharacter : missing parses")
 		// Missing parses
 		// This is expected and we should assume we just need to record them
-		dbParses, err = logs[guildID].GetCurrentParsesForCharacter(charID)
+		dbParses, err = logs[guildID].GetCurrentParsesForCharacter(char.CharID)
 		if err != nil {
 			return err
 		}
 
-		err = storeWCLogsParsesForCharacter(db, charID, dbParses)
+		err = storeWCLogsParsesForCharacter(db, char.CharID, dbParses)
 		if err != nil {
 			return err
 		}
@@ -207,26 +227,27 @@ func checkWCLogsForCharacterUpdates(guildID string, charID int) error {
 	}
 
 	if report.EndTime == dbReport.EndTime {
-		log.Debug().Int("charID", charID).
+		log.Debug().Int("charID", char.CharID).
 			Msg("checkWCLogsForCharacterUpdates : no latest report changes")
 		return nil
 	}
 
-	log.Debug().Int("charID", charID).
+	log.Debug().Int("charID", char.CharID).
 		Float32("endTime", report.EndTime).Float32("dbEndTime", dbReport.EndTime).
 		Msg("checkWCLogsForCharacterUpdates : latest report changes")
 
 	// Store metadata now, too bad if we err later
-	err = storeWCLogsLatestReportForCharacter(db, charID, report)
+	err = storeWCLogsLatestReportForCharacter(db, char.CharID, report)
 	if err != nil {
 		return err
 	}
 
-	parses, err := logs[guildID].GetCurrentParsesForCharacter(charID)
+	parses, err := logs[guildID].GetCurrentParsesForCharacter(char.CharID)
 	if err != nil {
 		return err
 	}
 
+	newParses := false
 	for metric, rankings := range *parses {
 		for _, ranking := range rankings.Rankings {
 			for _, dbRanking := range (*dbParses)[metric].Rankings {
@@ -234,13 +255,28 @@ func checkWCLogsForCharacterUpdates(guildID string, charID int) error {
 					if ranking.RankPercent != dbRanking.RankPercent {
 						log.Info().
 							Str("metric", metric).
-							Int("charID", charID).Float32("oldParse", dbRanking.RankPercent).
+							Int("charID", char.CharID).Float32("oldParse", dbRanking.RankPercent).
 							Float32("newParse", ranking.RankPercent).Msg("New parse !")
-						// TODO: Send message & emote on changes
-						// TODO: Find out which channel to use
+						link := "https://classic.warcraftlogs.com/reports/" + report.Code
+						content := "New parse for " + char.Slug + " on " + ranking.Encounter.Name + " !\n" +
+							fmt.Sprintf("%.2f", dbRanking.RankPercent) + " :arrow_right: " +
+							"**" + fmt.Sprintf("%.2f", ranking.RankPercent) + "** [" + metric + "] " +
+							winEmojis[rand.Intn(len(winEmojis))] + "\n" + link
+						_, err := s.ChannelMessageSend(char.ChannelID, content)
+						newParses = true
+						if err != nil {
+							return err
+						}
 					}
 				}
 			}
+		}
+	}
+
+	if newParses {
+		err = storeWCLogsParsesForCharacter(db, char.CharID, parses)
+		if err != nil {
+			return err
 		}
 	}
 
@@ -264,8 +300,8 @@ func setupWCLogsTicker(guildID string) {
 		case <-timerStopper[guildID]:
 			return
 		case <-characterTrackTicker[guildID].C:
-			for _, charID := range trackedCharacters[guildID] {
-				err := checkWCLogsForCharacterUpdates(guildID, charID)
+			for _, char := range *trackedCharacters[guildID] {
+				err := checkWCLogsForCharacterUpdates(guildID, &char)
 				if err != nil {
 					log.Error().Err(err).Msg("checkWCLogsForCharacterUpdates")
 				}

@@ -9,21 +9,21 @@ import (
 )
 
 func fetchWCLogsCredentials(db *buntdb.DB, guildID string) (*wclogs.Credentials, error) {
-	creds := &wclogs.Credentials{}
+	var creds wclogs.Credentials
 	err := db.View(func(tx *buntdb.Tx) error {
 		val, err := tx.Get("wclogs-creds-" + guildID)
 		if err != nil {
 			return err
 		}
 
-		return json.Unmarshal([]byte(val), creds)
+		return json.Unmarshal([]byte(val), &creds)
 	})
 
 	if err != nil {
 		return nil, err
 	}
 
-	return creds, nil
+	return &creds, nil
 }
 
 func storeWCLogsCredentials(db *buntdb.DB, guildID string, creds *wclogs.Credentials) error {
@@ -41,21 +41,21 @@ func storeWCLogsCredentials(db *buntdb.DB, guildID string, creds *wclogs.Credent
 }
 
 func fetchWCLogsLatestReportForCharacter(db *buntdb.DB, charID int) (*wclogs.Report, error) {
-	report := &wclogs.Report{}
+	var report wclogs.Report
 	err := db.View(func(tx *buntdb.Tx) error {
 		val, err := tx.Get("wclogs-latest-report-" + strconv.Itoa(charID))
 		if err != nil {
 			return err
 		}
 
-		return json.Unmarshal([]byte(val), report)
+		return json.Unmarshal([]byte(val), &report)
 	})
 
 	if err != nil {
 		return nil, err
 	}
 
-	return report, nil
+	return &report, nil
 }
 
 func storeWCLogsLatestReportForCharacter(db *buntdb.DB, charID int, report *wclogs.Report) error {
@@ -72,26 +72,26 @@ func storeWCLogsLatestReportForCharacter(db *buntdb.DB, charID int, report *wclo
 	return err
 }
 
-func fetchWCLogsTrackedCharacters(db *buntdb.DB, guildID string) ([]int, error) {
-	characters := &[]int{}
+func fetchWCLogsTrackedCharacters(db *buntdb.DB, guildID string) (*[]TrackedCharacter, error) {
+	var characters []TrackedCharacter
 	err := db.View(func(tx *buntdb.Tx) error {
 		val, err := tx.Get("wclogs-tracked-characters-" + guildID)
 		if err != nil {
 			return err
 		}
 
-		return json.Unmarshal([]byte(val), characters)
+		return json.Unmarshal([]byte(val), &characters)
 	})
 
 	if err != nil {
 		return nil, err
 	}
 
-	return *characters, nil
+	return &characters, nil
 }
 
-func storeWCLogsTrackedCharacters(db *buntdb.DB, guildID string, characters []int) error {
-	bytes, err := json.Marshal(characters)
+func storeWCLogsTrackedCharacters(db *buntdb.DB, guildID string, characters *[]TrackedCharacter) error {
+	bytes, err := json.Marshal(*characters)
 	if err != nil {
 		return err
 	}
@@ -105,21 +105,21 @@ func storeWCLogsTrackedCharacters(db *buntdb.DB, guildID string, characters []in
 }
 
 func fetchWCLogsParsesForCharacter(db *buntdb.DB, charID int) (*wclogs.Parses, error) {
-	parses := &wclogs.Parses{}
+	var parses wclogs.Parses
 	err := db.View(func(tx *buntdb.Tx) error {
 		val, err := tx.Get("wclogs-parses-" + strconv.Itoa(charID))
 		if err != nil {
 			return err
 		}
 
-		return json.Unmarshal([]byte(val), parses)
+		return json.Unmarshal([]byte(val), &parses)
 	})
 
 	if err != nil {
 		return nil, err
 	}
 
-	return parses, nil
+	return &parses, nil
 }
 
 func storeWCLogsParsesForCharacter(db *buntdb.DB, charID int, parses *wclogs.Parses) error {

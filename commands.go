@@ -78,6 +78,12 @@ var commands = []*discordgo.ApplicationCommand{
 				Description: "Character server region (EU/US)",
 				Required:    true,
 			},
+			{
+				Type:        discordgo.ApplicationCommandOptionChannel,
+				Name:        "channel",
+				Description: "Channel used to announce updates",
+				Required:    false,
+			},
 		},
 	},
 	{
@@ -146,8 +152,12 @@ var commandsHandlers = map[string]func(s *discordgo.Session, i *discordgo.Intera
 		char := i.ApplicationCommandData().Options[0].StringValue()
 		server := i.ApplicationCommandData().Options[1].StringValue()
 		region := i.ApplicationCommandData().Options[2].StringValue()
+		channel := i.ChannelID
+		if len(i.ApplicationCommandData().Options) > 3 {
+			channel = i.ApplicationCommandData().Options[3].ChannelValue(s).ID
+		}
 
-		response := handleTrackCharacter(char, server, region, i.GuildID)
+		response := handleTrackCharacter(char, server, region, i.GuildID, channel)
 
 		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
