@@ -1,0 +1,11 @@
+version: '3.7'
+
+services:
+  mangonel:
+    image: zergrael/epa:latest
+    container_name: epa
+    volumes:
+      - ./epa:/storage
+    environment:
+      - DISCORD_BOT_TOKEN=
+    restart: unless-stopped
