@@ -34,6 +34,7 @@ func instantiateWCLogsForGuild(guildID string) {
 	creds, err := fetchWCLogsCredentials(db, guildID)
 	if err != nil || creds == nil {
 		log.Debug().Err(err).Str("guildID", guildID).Msg("Cannot read WCLogs credentials for guild")
+		return
 	}
 
 	// Check WCLogs credentials
