@@ -296,17 +296,19 @@ func setupWCLogsTicker(guildID string) {
 
 	log.Info().Str("guildID", guildID).Msg("Started ticker")
 
-	for {
-		select {
-		case <-timerStopper[guildID]:
-			return
-		case <-characterTrackTicker[guildID].C:
-			for _, char := range *trackedCharacters[guildID] {
-				err := checkWCLogsForCharacterUpdates(guildID, &char)
-				if err != nil {
-					log.Error().Err(err).Msg("checkWCLogsForCharacterUpdates")
+	go func(guildID string) {
+		for {
+			select {
+			case <-timerStopper[guildID]:
+				return
+			case <-characterTrackTicker[guildID].C:
+				for _, char := range *trackedCharacters[guildID] {
+					err := checkWCLogsForCharacterUpdates(guildID, &char)
+					if err != nil {
+						log.Error().Err(err).Msg("checkWCLogsForCharacterUpdates")
+					}
 				}
 			}
 		}
-	}
+	}(guildID)
 }
