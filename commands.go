@@ -3,14 +3,15 @@ package main
 import (
 	"github.com/bwmarrin/discordgo"
 	"github.com/rs/zerolog/log"
+	"strconv"
 )
 
 var falsePointer = false
 
 var commands = []*discordgo.ApplicationCommand{
 	{
-		Name:        "ping",
-		Description: "Send a ping to the bot",
+		Name:        "epa",
+		Description: "Display configuration & information about the bot",
 	},
 	{
 		Name:              "register-warcraftlogs",
@@ -93,11 +94,20 @@ var commands = []*discordgo.ApplicationCommand{
 }
 
 var commandsHandlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate){
-	"ping": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	"epa": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+		response := "Hello there\n"
+		if logs[i.GuildID] != nil {
+			response += "WarcraftLogs engine is running, currently tracking " +
+				strconv.Itoa(len(*trackedCharacters[i.GuildID])) +
+				" characters, see /track-character command to add more."
+		} else {
+			response += "WarcraftLogs is disabled, see /register-warcraftlogs command as an admin"
+		}
+
 		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
 			Data: &discordgo.InteractionResponseData{
-				Content: "Pong !",
+				Content: response,
 			},
 		})
 	},

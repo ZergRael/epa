@@ -57,12 +57,10 @@ type Report struct {
 	EndTime float32
 }
 
-type rateLimit struct {
-	RateLimitData struct {
-		LimitPerHour        int
-		PointsSpentThisHour float32
-		PointsResetIn       int
-	}
+type RateLimitData struct {
+	LimitPerHour        int
+	PointsSpentThisHour float32
+	PointsResetIn       int
 }
 
 func NewWCLogs(creds *Credentials) *WCLogs {
@@ -83,6 +81,17 @@ func NewWCLogs(creds *Credentials) *WCLogs {
 }
 
 func (w *WCLogs) Check() bool {
+	rateLimit, err := w.GetRateLimits()
+	if err != nil {
+		return false
+	}
+
+	log.Debug().Interface("rateLimitData", rateLimit).Msg("WCLogs OK")
+
+	return true
+}
+
+func (w *WCLogs) GetRateLimits() (*RateLimitData, error) {
 	req := graphql.NewRequest(`
     query {
         rateLimitData {
@@ -93,16 +102,16 @@ func (w *WCLogs) Check() bool {
     }
 `)
 
-	var resp rateLimit
-
-	if err := w.client.Run(context.Background(), req, &resp); err != nil {
-		log.Error().Err(err).Msg("Check failed")
-		return false
+	var resp struct {
+		RateLimitData RateLimitData
 	}
 
-	log.Debug().Interface("rateLimitData", resp.RateLimitData).Msg("WCLogs checked")
+	if err := w.client.Run(context.Background(), req, &resp); err != nil {
+		log.Error().Err(err).Msg("GetRateLimits failed")
+		return nil, err
+	}
 
-	return true
+	return &resp.RateLimitData, nil
 }
 
 func (w *WCLogs) GetCharacterID(char, server, region string) (int, error) {
