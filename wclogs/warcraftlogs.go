@@ -5,7 +5,6 @@ import (
 	"errors"
 
 	"github.com/machinebox/graphql"
-	"github.com/rs/zerolog/log"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/clientcredentials"
 )
@@ -63,7 +62,7 @@ type RateLimitData struct {
 	PointsResetIn       int
 }
 
-func NewWCLogs(creds *Credentials) *WCLogs {
+func NewWCLogs(creds *Credentials, debugLogsFunc func(string)) *WCLogs {
 	c := clientcredentials.Config{
 		ClientID:     creds.ClientID,
 		ClientSecret: creds.ClientSecret,
@@ -73,7 +72,9 @@ func NewWCLogs(creds *Credentials) *WCLogs {
 
 	// TODO: check context value
 	client := graphql.NewClient(classicApiUri, graphql.WithHTTPClient(c.Client(context.Background())))
-	client.Log = func(s string) { log.Debug().Msg(s) }
+	if debugLogsFunc != nil {
+		client.Log = debugLogsFunc
+	}
 
 	w := WCLogs{client: client}
 
@@ -81,14 +82,8 @@ func NewWCLogs(creds *Credentials) *WCLogs {
 }
 
 func (w *WCLogs) Check() bool {
-	rateLimit, err := w.GetRateLimits()
-	if err != nil {
-		return false
-	}
-
-	log.Debug().Interface("rateLimitData", rateLimit).Msg("WCLogs OK")
-
-	return true
+	_, err := w.GetRateLimits()
+	return err == nil
 }
 
 func (w *WCLogs) GetRateLimits() (*RateLimitData, error) {
@@ -107,7 +102,6 @@ func (w *WCLogs) GetRateLimits() (*RateLimitData, error) {
 	}
 
 	if err := w.client.Run(context.Background(), req, &resp); err != nil {
-		log.Error().Err(err).Msg("GetRateLimits failed")
 		return nil, err
 	}
 
