@@ -54,7 +54,7 @@ func init() {
 func main() {
 	// Database
 	var err error
-	db, err = buntdb.Open("data.db")
+	db, err = buntdb.Open("storage/data.db")
 	if err != nil {
 		log.Fatal().Err(err).Msg("Cannot open database")
 	}
