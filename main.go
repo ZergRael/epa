@@ -15,17 +15,17 @@ import (
 
 // Application flags
 var (
-	// Discord bot access token
+	// botToken is Discord bot access token
 	botToken string
 )
 
 // Global variables
 var (
-	// Global discord session
+	// s is global discord session
 	s *discordgo.Session
-	// Global database handler
+	// db is global database handler
 	db *buntdb.DB
-	// WCLogs handler for each guildID
+	// logs is WCLogs handler for each guildID
 	logs map[string]*wclogs.WCLogs
 )
 
@@ -85,6 +85,10 @@ func main() {
 			log.Error().Err(err).Msg("Failed to properly close session")
 		}
 	}(s)
+
+	if s.State == nil {
+		log.Fatal().Msg("Failed to get session state")
+	}
 
 	log.Debug().Str("id", s.State.User.ID).Msg("Session opened for bot")
 
