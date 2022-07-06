@@ -92,6 +92,10 @@ var commands = []*discordgo.ApplicationCommand{
 			},
 		},
 	},
+	{
+		Name:        "list-tracked-characters",
+		Description: "List WCLogs parses tracked characters",
+	},
 }
 
 var commandsHandlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate){
@@ -109,6 +113,7 @@ var commandsHandlers = map[string]func(s *discordgo.Session, i *discordgo.Intera
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
 			Data: &discordgo.InteractionResponseData{
 				Content: response,
+				Flags:   uint64(discordgo.MessageFlagsEphemeral),
 			},
 		})
 	},
@@ -154,7 +159,6 @@ var commandsHandlers = map[string]func(s *discordgo.Session, i *discordgo.Intera
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
 			Data: &discordgo.InteractionResponseData{
 				Content: response,
-				Flags:   uint64(discordgo.MessageFlagsEphemeral),
 			},
 		})
 	},
@@ -169,7 +173,16 @@ var commandsHandlers = map[string]func(s *discordgo.Session, i *discordgo.Intera
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
 			Data: &discordgo.InteractionResponseData{
 				Content: response,
-				Flags:   uint64(discordgo.MessageFlagsEphemeral),
+			},
+		})
+	},
+	"list-tracked-characters": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+		response := handleListTrackedCharacters(i.GuildID)
+
+		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: response,
 			},
 		})
 	},

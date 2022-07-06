@@ -195,6 +195,19 @@ func handleUntrackCharacter(name, server, region, guildID string) string {
 	return charSlug + " is not tracked"
 }
 
+func handleListTrackedCharacters(guildID string) string {
+	if logs[guildID] == nil {
+		return "Missing WarcraftLogs credentials setup"
+	}
+
+	res := "Tracked characters :\n"
+	for _, char := range *trackedCharacters[guildID] {
+		res += char.Slug + "\n"
+	}
+
+	return res
+}
+
 func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) error {
 	dbReport, err := fetchWCLogsLatestReportForCharacter(db, char.CharID)
 	if err != nil {
