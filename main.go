@@ -15,13 +15,17 @@ import (
 
 // Application flags
 var (
-	BotToken = flag.String("token", "", "Bot access token")
+	// Discord bot access token
+	botToken string
 )
 
 // Global variables
 var (
-	s    *discordgo.Session
-	db   *buntdb.DB
+	// Global discord session
+	s *discordgo.Session
+	// Global database handler
+	db *buntdb.DB
+	// WCLogs handler for each guildID
 	logs map[string]*wclogs.WCLogs
 )
 
@@ -29,16 +33,17 @@ var (
 const globalCommands = false
 
 func init() {
+	flag.StringVar(&botToken, "token", lookupEnvOrString("DISCORD_BOT_TOKEN", ""), "Bot discord access token")
 	flag.Parse()
 
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339})
 
-	if *BotToken == "" {
-		log.Fatal().Msg("Missing --token flag")
+	if botToken == "" {
+		log.Fatal().Msg("Missing --token flag / DISCORD_BOT_TOKEN env variable")
 	}
 
 	var err error
-	s, err = discordgo.New("Bot " + *BotToken)
+	s, err = discordgo.New("Bot " + botToken)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Invalid bot parameters")
 	}
@@ -100,4 +105,12 @@ func main() {
 	}
 
 	log.Info().Msg("Graceful shutdown")
+}
+
+func lookupEnvOrString(key string, defaultVal string) string {
+	if val, ok := os.LookupEnv(key); ok {
+		return val
+	}
+
+	return defaultVal
 }
