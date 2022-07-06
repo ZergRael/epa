@@ -1,11 +1,6 @@
 package main
 
 import (
-	"fmt"
-	"regexp"
-	"strconv"
-	"time"
-
 	"github.com/bwmarrin/discordgo"
 	"github.com/rs/zerolog/log"
 )
@@ -62,79 +57,4 @@ func commandsHandler(s *discordgo.Session, interaction *discordgo.InteractionCre
 	if commandFunc, ok := commandsHandlers[interaction.ApplicationCommandData().Name]; ok {
 		commandFunc(s, interaction)
 	}
-}
-
-func addReminder(reason string, t *time.Time, diffMinutes int, channelID string) error {
-	if t == nil {
-		_, err := s.ChannelMessageSend(channelID, "Failed to parse time")
-		if err != nil {
-			return err
-		}
-		return nil
-	}
-
-	at := t.Add(time.Duration(-diffMinutes) * time.Minute)
-	in := time.Until(at)
-	if in < 0 {
-		_, err := s.ChannelMessageSend(channelID, "Cannot set a reminder in the past")
-		if err != nil {
-			return err
-		}
-		return nil
-	}
-
-	log.Info().Str("reason", reason).Time("t", *t).Dur("in", in).Int("diffMinutes", diffMinutes).Msg("Add reminder")
-
-	time.AfterFunc(in, func() {
-		log.Info().Str("reason", reason).Time("t", *t).Msg("Timer done")
-		if reason != "" {
-			_, err := s.ChannelMessageSend(channelID, fmt.Sprintf("@here Reminder %s (%s)", reason, t.String()))
-			if err != nil {
-				log.Error().Err(err).Msg("Failed to send message")
-			}
-		} else {
-			_, err := s.ChannelMessageSend(channelID, fmt.Sprintf("@here Reminder (%s)", t.String()))
-			if err != nil {
-				log.Error().Err(err).Msg("Failed to send message")
-			}
-		}
-	})
-
-	return nil
-}
-
-var regexTimeH = regexp.MustCompile(`(\d{1,2})(?:[hH:\-]?(\d{2}))?`)
-
-func parseTime(t string) *time.Time {
-	now := time.Now()
-	matches := regexTimeH.FindStringSubmatch(t)
-	log.Debug().Strs("matches", matches).Send()
-	if len(matches) == 0 {
-		return nil
-	}
-	hours, err := strconv.ParseInt(matches[1], 10, 8)
-	if err != nil {
-		log.Error().Err(err).Msg("Failed to parse hours")
-		return nil
-	}
-
-	var minutes int64
-	if matches[2] != "" {
-		minutes, err = strconv.ParseInt(matches[2], 10, 8)
-		if err != nil {
-			log.Error().Err(err).Msg("Failed to parse minutes")
-			minutes = 0
-		}
-	}
-
-	at := time.Date(now.Year(), now.Month(), now.Day(), int(hours), int(minutes), 00, 00, now.Location())
-	if at.Before(now) {
-		at = at.AddDate(0, 0, 1)
-		if at.Before(now) {
-			log.Error().Time("at", at).Msg("Failed to generate a proper future date")
-			return nil
-		}
-	}
-
-	return &at
 }
