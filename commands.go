@@ -1,9 +1,10 @@
 package main
 
 import (
+	"strconv"
+
 	"github.com/bwmarrin/discordgo"
 	"github.com/rs/zerolog/log"
-	"strconv"
 )
 
 var falsePointer = false
@@ -177,13 +178,11 @@ var commandsHandlers = map[string]func(s *discordgo.Session, i *discordgo.Intera
 func addCommands(guildID string) {
 	log.Debug().Str("guildID", guildID).Msg("Adding commands...")
 
-	for _, v := range commands {
-		cmd, err := s.ApplicationCommandCreate(s.State.User.ID, guildID, v)
-		if err != nil {
-			log.Fatal().Err(err).Msgf("Cannot create : %v", v.Name)
-		}
-		log.Debug().Str("name", cmd.Name).Str("id", cmd.ID).Str("guild", guildID).Msg("Added command")
+	cmds, err := s.ApplicationCommandBulkOverwrite(s.State.User.ID, guildID, commands)
+	if err != nil {
+		log.Error().Err(err).Msgf("Cannot create commands")
 	}
+	log.Debug().Str("guild", guildID).Interface("commands", cmds).Msg("Added commands")
 }
 
 func removeCommands(guildID string) {
