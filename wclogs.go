@@ -14,6 +14,7 @@ var trackedCharacters map[string]*[]TrackedCharacter
 var characterTrackTicker map[string]*time.Ticker
 var timerStopper map[string]chan bool
 
+// TODO: Adjust ticker duration based on latest report age
 const characterTrackTickerDuration = 2 * time.Minute
 
 type TrackedCharacter struct {
@@ -136,6 +137,7 @@ func handleTrackCharacter(name, server, region, guildID, channelID string) strin
 
 	for _, char := range *trackedCharacters[guildID] {
 		if char.CharID == charID {
+			// TODO: handle already tracked as update tracking
 			log.Warn().Str("slug", charSlug).Int("charID", charID).Err(err).Msg("Already tracked")
 			return charSlug + " is already tracked"
 		}
@@ -202,6 +204,7 @@ func handleListTrackedCharacters(guildID string) string {
 
 	res := "Tracked characters :\n"
 	for _, char := range *trackedCharacters[guildID] {
+		// TODO: Add latest report EndTime from db
 		res += char.Slug + "\n"
 	}
 
@@ -241,12 +244,13 @@ func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) erro
 	}
 
 	if report.EndTime == dbReport.EndTime {
-		log.Debug().Int("charID", char.CharID).
+		log.Debug().Int("charID", char.CharID).Str("code", report.Code).
 			Msg("checkWCLogsForCharacterUpdates : no latest report changes")
+		// TODO: Check if EndTime is too old and ask if we should continue tracking ?
 		return nil
 	}
 
-	log.Debug().Int("charID", char.CharID).
+	log.Debug().Int("charID", char.CharID).Str("code", report.Code).
 		Float32("endTime", report.EndTime).Float32("dbEndTime", dbReport.EndTime).
 		Msg("checkWCLogsForCharacterUpdates : latest report changes")
 
@@ -265,8 +269,8 @@ func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) erro
 	for metric, rankings := range *parses {
 		for _, ranking := range rankings.Rankings {
 			for _, dbRanking := range (*dbParses)[metric].Rankings {
-				if ranking.Encounter == dbRanking.Encounter {
-					if ranking.RankPercent != dbRanking.RankPercent {
+				if ranking.Encounter.ID == dbRanking.Encounter.ID {
+					if ranking.RankPercent > dbRanking.RankPercent {
 						log.Info().
 							Str("metric", metric).
 							Int("charID", char.CharID).Float32("oldParse", dbRanking.RankPercent).
@@ -281,6 +285,8 @@ func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) erro
 						if err != nil {
 							return err
 						}
+					} else if ranking.RankPercent != dbRanking.RankPercent {
+						newParses = true
 					}
 				}
 			}
