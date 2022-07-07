@@ -169,7 +169,8 @@ func (w *WCLogs) GetCurrentParsesForCharacter(charID int) (*Parses, error) {
     query ($id: Int!, $metric: CharacterRankingMetricType!) {
 		characterData {
 			character(id: $id) {
-				zoneRankings(metric: $metric)
+				hpsZoneRankings: zoneRankings(metric: hps)
+				dpsZoneRankings: zoneRankings(metric: dps)
 			}
 		}
     }
@@ -177,25 +178,22 @@ func (w *WCLogs) GetCurrentParsesForCharacter(charID int) (*Parses, error) {
 
 	req.Var("id", charID)
 
-	parses := make(Parses)
-
-	for _, metric := range ParsesMetrics {
-		req.Var("metric", metric)
-
-		var resp struct {
-			CharacterData struct {
-				Character struct {
-					ZoneRankings ZoneRankings
-				}
+	var resp struct {
+		CharacterData struct {
+			Character struct {
+				HpsZoneRankings ZoneRankings
+				DpsZoneRankings ZoneRankings
 			}
 		}
-
-		if err := w.client.Run(context.Background(), req, &resp); err != nil {
-			return nil, err
-		}
-
-		parses[metric] = resp.CharacterData.Character.ZoneRankings
 	}
+
+	if err := w.client.Run(context.Background(), req, &resp); err != nil {
+		return nil, err
+	}
+
+	parses := make(Parses)
+	parses["hps"] = resp.CharacterData.Character.HpsZoneRankings
+	parses["dps"] = resp.CharacterData.Character.DpsZoneRankings
 
 	return &parses, nil
 }
