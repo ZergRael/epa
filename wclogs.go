@@ -134,11 +134,12 @@ func handleTrackCharacter(name, server, region, guildID, channelID string) strin
 		return "Failed to track " + char.Slug() + " : character not found !"
 	}
 
-	for _, c := range *trackedCharacters[guildID] {
+	for idx, c := range *trackedCharacters[guildID] {
 		if c.Character.ID == char.ID {
-			// TODO: handle already tracked as update tracking
+			// Remove currently tracked character, it will be added back again later
+			// hackish way to allow announce channel updates
+			*trackedCharacters[guildID] = append((*trackedCharacters[guildID])[:idx], (*trackedCharacters[guildID])[idx+1:]...)
 			log.Warn().Str("slug", char.Slug()).Int("charID", char.ID).Err(err).Msg("Already tracked")
-			return char.Slug() + " is already tracked"
 		}
 	}
 
