@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"math/rand"
-	"strconv"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -169,6 +168,7 @@ func handleTrackCharacter(name, server, region, guildID, channelID string) strin
 	// Don't record parses here as it may be too slow for discord response
 	// Parses will be recorded on next check ticker
 
+	log.Debug().Str("slug", char.Slug()).Err(err).Msg("Track successful")
 	return char.Slug() + " is now tracked"
 }
 
@@ -177,24 +177,22 @@ func handleUntrackCharacter(name, server, region, guildID string) string {
 		return "Missing WarcraftLogs credentials setup"
 	}
 
-	charSlug := name + "-" + server + "[" + region + "]"
 	char, err := logs[guildID].GetCharacter(name, server, region)
 	if err != nil {
-		log.Error().Str("slug", charSlug).Err(err).Msg("GetCharacterID failed")
-		return "Failed to untrack " + charSlug + " : character not found !"
+		log.Error().Str("slug", char.Slug()).Err(err).Msg("GetCharacterID failed")
+		return "Failed to untrack " + char.Slug() + " : character not found !"
 	}
 
-	charSlug += " (" + strconv.Itoa(char.ID) + ")"
 	for idx, c := range *trackedCharacters[guildID] {
 		if c.Character.ID == char.ID {
 			*trackedCharacters[guildID] = append((*trackedCharacters[guildID])[:idx], (*trackedCharacters[guildID])[idx+1:]...)
-			log.Debug().Str("slug", charSlug).Err(err).Msg("Untracked")
-			return charSlug + " is already tracked"
+			log.Debug().Str("slug", char.Slug()).Err(err).Msg("Untrack successful")
+			return char.Slug() + " is not tracked anymore"
 		}
 	}
 
-	log.Warn().Str("slug", charSlug).Err(err).Msg("Not tracked")
-	return charSlug + " is not tracked"
+	log.Warn().Str("slug", char.Slug()).Err(err).Msg("Not tracked")
+	return char.Slug() + " was not tracked"
 }
 
 func handleListTrackedCharacters(guildID string) string {
