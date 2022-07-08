@@ -13,21 +13,17 @@ import (
 	"github.com/zergrael/epa/wclogs"
 )
 
-// Application flags
-var (
-	// botToken is Discord bot access token
-	botToken string
-)
+// botToken is Discord bot access token
+var botToken string
 
-// Global variables
-var (
-	// s is global discord session
-	s *discordgo.Session
-	// db is global database handler
-	db *buntdb.DB
-	// logs is WCLogs handler for each guildID
-	logs map[string]*wclogs.WCLogs
-)
+// s is global discord session
+var s *discordgo.Session
+
+// db is global database handler
+var db *buntdb.DB
+
+// logs is WCLogs handler for each guildID
+var logs map[string]*wclogs.WCLogs
 
 // FIXME: Global commands register slowly, stick to guild specific commands for now
 const globalCommands = false
@@ -53,6 +49,7 @@ func init() {
 
 func main() {
 	// Database
+
 	var err error
 	db, err = buntdb.Open("storage/data.db")
 	if err != nil {
@@ -66,6 +63,7 @@ func main() {
 	}(db)
 
 	// Discordgo handlers
+
 	s.AddHandler(ready)
 	s.AddHandler(guildCreate)
 	s.AddHandler(guildDelete)
@@ -75,6 +73,7 @@ func main() {
 	s.Identify.Intents = discordgo.IntentsAllWithoutPrivileged
 
 	// Discordgo startup
+
 	err = s.Open()
 	if err != nil {
 		log.Fatal().Err(err).Msg("Cannot open the session")
@@ -99,11 +98,11 @@ func main() {
 	log.Info().Msg("Invite the bot to your server with https://discordapp.com/oauth2/authorize?client_id=" + s.State.User.ID + "&scope=bot%20applications.commands")
 
 	// Bot run loop
-	stop := make(chan os.Signal)
+
+	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt)
 	<-stop
 
-	// FIXME: Figure out if we need to remove commands on shutdown
 	if globalCommands {
 		removeCommands("")
 	}
@@ -111,6 +110,7 @@ func main() {
 	log.Info().Msg("Graceful shutdown")
 }
 
+// lookupEnvOrString returns key environment variable or defaultVal
 func lookupEnvOrString(key string, defaultVal string) string {
 	if val, ok := os.LookupEnv(key); ok {
 		return val

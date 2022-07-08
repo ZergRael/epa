@@ -109,13 +109,17 @@ var commandsHandlers = map[string]func(s *discordgo.Session, i *discordgo.Intera
 			response += "WarcraftLogs is disabled, see /register-warcraftlogs command as an admin"
 		}
 
-		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
 			Data: &discordgo.InteractionResponseData{
 				Content: response,
 				Flags:   uint64(discordgo.MessageFlagsEphemeral),
 			},
 		})
+
+		if err != nil {
+			log.Error().Err(err).Msg("/epa command response failed")
+		}
 	},
 
 	"register-warcraftlogs": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -124,24 +128,32 @@ var commandsHandlers = map[string]func(s *discordgo.Session, i *discordgo.Intera
 
 		response := handleRegisterWarcraftLogs(clientID, clientSecret, i.GuildID)
 
-		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
 			Data: &discordgo.InteractionResponseData{
 				Content: response,
 				Flags:   uint64(discordgo.MessageFlagsEphemeral),
 			},
 		})
+
+		if err != nil {
+			log.Error().Err(err).Msg("/register-warcraftlogs command response failed")
+		}
 	},
 	"unregister-warcraftlogs": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		response := handleUnregisterWarcraftLogs(i.GuildID)
 
-		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
 			Data: &discordgo.InteractionResponseData{
 				Content: response,
 				Flags:   uint64(discordgo.MessageFlagsEphemeral),
 			},
 		})
+
+		if err != nil {
+			log.Error().Err(err).Msg("/unregister-warcraftlogs command response failed")
+		}
 	},
 
 	"track-character": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -155,12 +167,16 @@ var commandsHandlers = map[string]func(s *discordgo.Session, i *discordgo.Intera
 
 		response := handleTrackCharacter(char, server, region, i.GuildID, channel)
 
-		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
 			Data: &discordgo.InteractionResponseData{
 				Content: response,
 			},
 		})
+
+		if err != nil {
+			log.Error().Err(err).Msg("/track-character command response failed")
+		}
 	},
 	"untrack-character": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		char := i.ApplicationCommandData().Options[0].StringValue()
@@ -169,33 +185,41 @@ var commandsHandlers = map[string]func(s *discordgo.Session, i *discordgo.Intera
 
 		response := handleUntrackCharacter(char, server, region, i.GuildID)
 
-		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
 			Data: &discordgo.InteractionResponseData{
 				Content: response,
 			},
 		})
+
+		if err != nil {
+			log.Error().Err(err).Msg("/untrack-character command response failed")
+		}
 	},
 	"list-tracked-characters": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		response := handleListTrackedCharacters(i.GuildID)
 
-		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
 			Data: &discordgo.InteractionResponseData{
 				Content: response,
 			},
 		})
+
+		if err != nil {
+			log.Error().Err(err).Msg("/list-tracked-characters command response failed")
+		}
 	},
 }
 
 func addCommands(guildID string) {
 	log.Debug().Str("guildID", guildID).Msg("Adding commands...")
 
-	cmds, err := s.ApplicationCommandBulkOverwrite(s.State.User.ID, guildID, commands)
+	appCommands, err := s.ApplicationCommandBulkOverwrite(s.State.User.ID, guildID, commands)
 	if err != nil {
 		log.Error().Err(err).Msgf("Cannot create commands")
 	}
-	log.Debug().Str("guild", guildID).Interface("commands", cmds).Msg("Added commands")
+	log.Debug().Str("guild", guildID).Interface("commands", appCommands).Msg("Added commands")
 }
 
 func removeCommands(guildID string) {

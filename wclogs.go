@@ -30,6 +30,7 @@ var winEmojis = []string{
 	":chart_with_upwards_trend:",
 }
 
+// instantiateWCLogsForGuild tries to fetch wclogs.Credentials from database and validate them before starting ticker
 func instantiateWCLogsForGuild(guildID string) {
 	// WCLogs credentials
 	creds, err := fetchWCLogsCredentials(db, guildID)
@@ -44,7 +45,7 @@ func instantiateWCLogsForGuild(guildID string) {
 		return
 	}
 
-	w := wclogs.NewWCLogs(creds, nil)
+	w := wclogs.New(creds, true, nil)
 	if !w.Check() {
 		log.Warn().Str("guildID", guildID).Msg("Failed to reuse credentials for guild")
 	}
@@ -81,7 +82,7 @@ func destroyWCLogsForGuild(guildID string) {
 
 func handleRegisterWarcraftLogs(clientID, clientSecret, guildID string) string {
 	creds := &wclogs.Credentials{ClientID: clientID, ClientSecret: clientSecret}
-	w := wclogs.NewWCLogs(creds, nil)
+	w := wclogs.New(creds, true, nil)
 	if !w.Check() {
 		return "These API credentials cannot be used"
 	}
@@ -229,7 +230,7 @@ func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) erro
 	if err != nil {
 		log.Debug().Int("charID", char.CharID).Msg("fetchWCLogsParsesForCharacter : missing parses")
 		// Missing parses
-		// This is expected and we should assume we just need to record them
+		// This is expected, and we should assume we just need to record them
 		dbParses, err = logs[guildID].GetCurrentParsesForCharacter(char.CharID)
 		if err != nil {
 			return err
@@ -303,6 +304,7 @@ func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) erro
 	return nil
 }
 
+// setupWCLogsTicker starts the periodic check ticker, including character parses updates
 func setupWCLogsTicker(guildID string) {
 	if characterTrackTicker == nil {
 		characterTrackTicker = make(map[string]*time.Ticker)

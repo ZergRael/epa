@@ -1,3 +1,4 @@
+// Package wclogs contains most of the WarcraftLogs API service communication
 package wclogs
 
 import (
@@ -10,30 +11,34 @@ import (
 )
 
 //https://www.warcraftlogs.com/api/docs
-//https://www.warcraftlogs.com/v2-api-docs/warcraft/user.doc.html
+//https://www.warcraftlogs.com/v2-api-docs/warcraft/
 
 const (
-	authorizationUri   = "https://www.warcraftlogs.com/oauth/authorize"
+	// authorizationUri   = "https://www.warcraftlogs.com/oauth/authorize"
 	tokenUri           = "https://www.warcraftlogs.com/oauth/token"
 	retailApiUri       = "https://www.warcraftlogs.com/api/v2/client"
 	classicApiUri      = "https://classic.warcraftlogs.com/api/v2/client"
 	classicExpansionID = 1001
 )
 
+// WCLogs is the WarcraftLogs graphql API client holder
 type WCLogs struct {
 	client *graphql.Client
 }
 
+// Credentials represents WarcraftLogs credentials used to read from API
 type Credentials struct {
 	ClientID     string `json:"client_id"`
 	ClientSecret string `json:"client_secret"`
 }
 
+// Zone represents a WoW zone
 type Zone struct {
 	ID   int
 	Name string
 }
 
+// Ranking contains a RankPercent for a specific Encounter
 type Ranking struct {
 	Encounter struct {
 		ID   int
@@ -42,27 +47,30 @@ type Ranking struct {
 	RankPercent float32
 }
 
+// ZoneRankings contains a collection of Rankings for a specific Partition
 type ZoneRankings struct {
 	Partition int
 	Rankings  []Ranking
 }
 
+// Parses contains ZoneRankings for multiple metrics
 type Parses map[string]ZoneRankings
 
-var ParsesMetrics = []string{"hps", "dps"}
-
+// Report represents WarcraftLogs report metadata
 type Report struct {
 	Code    string
 	EndTime float32
 }
 
+// RateLimitData contains WarcraftLogs API rate limits results, usually 3600 points per hour
 type RateLimitData struct {
 	LimitPerHour        int
 	PointsSpentThisHour float32
 	PointsResetIn       int
 }
 
-func NewWCLogs(creds *Credentials, debugLogsFunc func(string)) *WCLogs {
+// New instantiates a new WCLogs graphql client
+func New(creds *Credentials, isClassic bool, debugLogsFunc func(string)) *WCLogs {
 	c := clientcredentials.Config{
 		ClientID:     creds.ClientID,
 		ClientSecret: creds.ClientSecret,
@@ -70,8 +78,13 @@ func NewWCLogs(creds *Credentials, debugLogsFunc func(string)) *WCLogs {
 		AuthStyle:    oauth2.AuthStyleInHeader,
 	}
 
+	uri := retailApiUri
+	if isClassic {
+		uri = classicApiUri
+	}
+
 	// TODO: check context value
-	client := graphql.NewClient(classicApiUri, graphql.WithHTTPClient(c.Client(context.Background())))
+	client := graphql.NewClient(uri, graphql.WithHTTPClient(c.Client(context.Background())))
 	if debugLogsFunc != nil {
 		client.Log = debugLogsFunc
 	}
@@ -81,11 +94,14 @@ func NewWCLogs(creds *Credentials, debugLogsFunc func(string)) *WCLogs {
 	return &w
 }
 
+// Check tries to connect to WarcraftLogs API, mostly used to validate credentials
+// TODO: it could be useful to also check rate limits here
 func (w *WCLogs) Check() bool {
 	_, err := w.GetRateLimits()
 	return err == nil
 }
 
+// GetRateLimits queries RateLimitData from WarcraftLogs API
 func (w *WCLogs) GetRateLimits() (*RateLimitData, error) {
 	req := graphql.NewRequest(`
     query {
@@ -108,7 +124,8 @@ func (w *WCLogs) GetRateLimits() (*RateLimitData, error) {
 	return &resp.RateLimitData, nil
 }
 
-func (w *WCLogs) GetCharacterID(char, server, region string) (int, error) {
+// GetCharacterID queries a WarcraftLogs character ID based on character name, server and server region
+func (w *WCLogs) GetCharacterID(name, server, region string) (int, error) {
 	req := graphql.NewRequest(`
     query ($name: String!, $server: String!, $region: String!) {
 		characterData {
@@ -119,7 +136,7 @@ func (w *WCLogs) GetCharacterID(char, server, region string) (int, error) {
     }
 `)
 
-	req.Var("name", char)
+	req.Var("name", name)
 	req.Var("server", server)
 	req.Var("region", region)
 
@@ -138,6 +155,7 @@ func (w *WCLogs) GetCharacterID(char, server, region string) (int, error) {
 	return resp.CharacterData.Character.ID, nil
 }
 
+// getZones queries a collection of Zone, this is static data for each expansion
 func (w *WCLogs) getZones() ([]Zone, error) {
 	req := graphql.NewRequest(`
     query ($expansion: Int!) {
@@ -164,6 +182,7 @@ func (w *WCLogs) getZones() ([]Zone, error) {
 	return resp.WorldData.Zones, nil
 }
 
+// GetCurrentParsesForCharacter queries HPS and DPS Parses for a specific character ID
 func (w *WCLogs) GetCurrentParsesForCharacter(charID int) (*Parses, error) {
 	req := graphql.NewRequest(`
     query ($id: Int!, $metric: CharacterRankingMetricType!) {
@@ -198,6 +217,7 @@ func (w *WCLogs) GetCurrentParsesForCharacter(charID int) (*Parses, error) {
 	return &parses, nil
 }
 
+// GetLatestReportMetadata queries latest Report for a specific character ID
 func (w *WCLogs) GetLatestReportMetadata(charID int) (*Report, error) {
 	req := graphql.NewRequest(`
     query ($id: Int!) {
