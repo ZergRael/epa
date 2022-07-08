@@ -21,6 +21,9 @@ const (
 	classicExpansionID = 1001
 )
 
+// classIDCanHeal defines a collection of classes capable of healing
+var classIDCanHeal = []int{2, 6, 7, 9}
+
 // WCLogs is the WarcraftLogs graphql API client holder
 type WCLogs struct {
 	client *graphql.Client
@@ -215,10 +218,10 @@ func (w *WCLogs) getZones() ([]Zone, error) {
 // GetCurrentParsesForCharacter queries HPS and DPS Parses for a specific Character
 func (w *WCLogs) GetCurrentParsesForCharacter(char *Character) (*Parses, error) {
 	req := graphql.NewRequest(`
-    query ($id: Int!, $metric: CharacterRankingMetricType!) {
+    query ($id: Int!, $withHps: Boolean!) {
 		characterData {
 			character(id: $id) {
-				hpsZoneRankings: zoneRankings(metric: hps)
+				hpsZoneRankings: zoneRankings(metric: hps) @include(if: $withHps)
 				dpsZoneRankings: zoneRankings(metric: dps)
 			}
 		}
@@ -226,6 +229,7 @@ func (w *WCLogs) GetCurrentParsesForCharacter(char *Character) (*Parses, error) 
 `)
 
 	req.Var("id", char.ID)
+	req.Var("withHps", char.CanHeal())
 
 	var resp struct {
 		CharacterData struct {
@@ -241,8 +245,10 @@ func (w *WCLogs) GetCurrentParsesForCharacter(char *Character) (*Parses, error) 
 	}
 
 	parses := make(Parses)
-	parses["hps"] = resp.CharacterData.Character.HpsZoneRankings
 	parses["dps"] = resp.CharacterData.Character.DpsZoneRankings
+	if char.CanHeal() {
+		parses["hps"] = resp.CharacterData.Character.HpsZoneRankings
+	}
 
 	return &parses, nil
 }
@@ -287,6 +293,18 @@ func (w *WCLogs) GetLatestReportMetadata(char *Character) (*Report, error) {
 	return &resp.CharacterData.Character.RecentReports.Data[0], nil
 }
 
+// Slug returns printable Character identifier
 func (t *Character) Slug() string {
 	return t.Name + " " + t.Region + "-" + t.Server
+}
+
+// CanHeal returns true if Character should also be tracked as a healer
+func (t *Character) CanHeal() bool {
+	for _, classID := range classIDCanHeal {
+		if classID == t.ClassID {
+			return true
+		}
+	}
+
+	return false
 }
