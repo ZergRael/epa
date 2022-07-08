@@ -44,7 +44,7 @@ func instantiateWCLogsForGuild(guildID string) {
 		return
 	}
 
-	w := wclogs.New(creds, true, nil)
+	w := wclogs.New(creds, wclogs.Classic, nil)
 	if !w.Check() {
 		log.Warn().Str("guildID", guildID).Msg("Failed to reuse credentials for guild")
 	}
@@ -81,7 +81,7 @@ func destroyWCLogsForGuild(guildID string) {
 
 func handleRegisterWarcraftLogs(clientID, clientSecret, guildID string) string {
 	creds := &wclogs.Credentials{ClientID: clientID, ClientSecret: clientSecret}
-	w := wclogs.New(creds, true, nil)
+	w := wclogs.New(creds, wclogs.Classic, nil)
 	if !w.Check() {
 		return "These API credentials cannot be used"
 	}

@@ -14,16 +14,17 @@ import (
 //https://www.warcraftlogs.com/v2-api-docs/warcraft/
 
 const (
-	// authorizationUri   = "https://www.warcraftlogs.com/oauth/authorize"
-	tokenUri           = "https://www.warcraftlogs.com/oauth/token"
-	retailApiUri       = "https://www.warcraftlogs.com/api/v2/client"
-	classicApiUri      = "https://classic.warcraftlogs.com/api/v2/client"
-	classicExpansionID = 1001
+	// authorizationUri = "https://www.warcraftlogs.com/oauth/authorize"
+	tokenUri      = "https://www.warcraftlogs.com/oauth/token"
+	retailApiUri  = "https://www.warcraftlogs.com/api/v2/client"
+	classicApiUri = "https://classic.warcraftlogs.com/api/v2/client"
+	vanillaApiUri = "https://vanilla.warcraftlogs.com/api/v2/client"
 )
 
 // WCLogs is the WarcraftLogs graphql API client holder
 type WCLogs struct {
 	client *graphql.Client
+	flavor Flavor
 }
 
 // Credentials represents WarcraftLogs credentials used to read from API
@@ -70,7 +71,7 @@ type RateLimitData struct {
 }
 
 // New instantiates a new WCLogs graphql client
-func New(creds *Credentials, isClassic bool, debugLogsFunc func(string)) *WCLogs {
+func New(creds *Credentials, flavor Flavor, debugLogsFunc func(string)) *WCLogs {
 	c := clientcredentials.Config{
 		ClientID:     creds.ClientID,
 		ClientSecret: creds.ClientSecret,
@@ -79,8 +80,11 @@ func New(creds *Credentials, isClassic bool, debugLogsFunc func(string)) *WCLogs
 	}
 
 	uri := retailApiUri
-	if isClassic {
+	switch flavor {
+	case Classic:
 		uri = classicApiUri
+	case Vanilla:
+		uri = vanillaApiUri
 	}
 
 	// TODO: check context value
@@ -89,7 +93,7 @@ func New(creds *Credentials, isClassic bool, debugLogsFunc func(string)) *WCLogs
 		client.Log = debugLogsFunc
 	}
 
-	w := WCLogs{client: client}
+	w := WCLogs{client: client, flavor: flavor}
 
 	return &w
 }
@@ -188,7 +192,7 @@ func (w *WCLogs) getZones() ([]Zone, error) {
 		}
     }
 `)
-	req.Var("expansion", classicExpansionID)
+	req.Var("expansion", w.flavor.LatestExpansion())
 
 	var resp struct {
 		WorldData struct {
