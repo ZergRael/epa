@@ -32,6 +32,15 @@ type Credentials struct {
 	ClientSecret string `json:"client_secret"`
 }
 
+// Character represents character info
+type Character struct {
+	ID      int
+	Name    string
+	Server  string
+	Region  string
+	ClassID int
+}
+
 // Zone represents a WoW zone
 type Zone struct {
 	ID   int
@@ -124,13 +133,20 @@ func (w *WCLogs) GetRateLimits() (*RateLimitData, error) {
 	return &resp.RateLimitData, nil
 }
 
-// GetCharacterID queries a WarcraftLogs character ID based on character name, server and server region
-func (w *WCLogs) GetCharacterID(name, server, region string) (int, error) {
+// GetCharacter queries WarcraftLogs character info based on character name, server and server region
+func (w *WCLogs) GetCharacter(name, server, region string) (*Character, error) {
 	req := graphql.NewRequest(`
     query ($name: String!, $server: String!, $region: String!) {
 		characterData {
 			character(name: $name, serverSlug: $server, serverRegion: $region) {
 				id
+				name
+				server {
+					name
+					region {
+						slug
+					}
+				}
 			}
 		}
     }
@@ -143,16 +159,30 @@ func (w *WCLogs) GetCharacterID(name, server, region string) (int, error) {
 	var resp struct {
 		CharacterData struct {
 			Character struct {
-				ID int
+				ID      int
+				Name    string
+				ClassID int
+				Server  struct {
+					Name   string
+					Region struct {
+						Slug string
+					}
+				}
 			}
 		}
 	}
 
 	if err := w.client.Run(context.Background(), req, &resp); err != nil {
-		return 0, err
+		return nil, err
 	}
 
-	return resp.CharacterData.Character.ID, nil
+	return &Character{
+		ID:      resp.CharacterData.Character.ID,
+		Name:    resp.CharacterData.Character.Name,
+		Server:  resp.CharacterData.Character.Server.Name,
+		Region:  resp.CharacterData.Character.Server.Region.Slug,
+		ClassID: resp.CharacterData.Character.ClassID,
+	}, nil
 }
 
 // getZones queries a collection of Zone, this is static data for each expansion
@@ -182,8 +212,8 @@ func (w *WCLogs) getZones() ([]Zone, error) {
 	return resp.WorldData.Zones, nil
 }
 
-// GetCurrentParsesForCharacter queries HPS and DPS Parses for a specific character ID
-func (w *WCLogs) GetCurrentParsesForCharacter(charID int) (*Parses, error) {
+// GetCurrentParsesForCharacter queries HPS and DPS Parses for a specific Character
+func (w *WCLogs) GetCurrentParsesForCharacter(char *Character) (*Parses, error) {
 	req := graphql.NewRequest(`
     query ($id: Int!, $metric: CharacterRankingMetricType!) {
 		characterData {
@@ -195,7 +225,7 @@ func (w *WCLogs) GetCurrentParsesForCharacter(charID int) (*Parses, error) {
     }
 `)
 
-	req.Var("id", charID)
+	req.Var("id", char.ID)
 
 	var resp struct {
 		CharacterData struct {
@@ -217,8 +247,8 @@ func (w *WCLogs) GetCurrentParsesForCharacter(charID int) (*Parses, error) {
 	return &parses, nil
 }
 
-// GetLatestReportMetadata queries latest Report for a specific character ID
-func (w *WCLogs) GetLatestReportMetadata(charID int) (*Report, error) {
+// GetLatestReportMetadata queries latest Report for a specific Character
+func (w *WCLogs) GetLatestReportMetadata(char *Character) (*Report, error) {
 	req := graphql.NewRequest(`
     query ($id: Int!) {
 		characterData {
@@ -234,7 +264,7 @@ func (w *WCLogs) GetLatestReportMetadata(charID int) (*Report, error) {
     }
 `)
 
-	req.Var("id", charID)
+	req.Var("id", char.ID)
 
 	var resp struct {
 		CharacterData struct {
@@ -255,4 +285,8 @@ func (w *WCLogs) GetLatestReportMetadata(charID int) (*Report, error) {
 	}
 
 	return &resp.CharacterData.Character.RecentReports.Data[0], nil
+}
+
+func (t *Character) Slug() string {
+	return t.Name + " " + t.Region + "-" + t.Server
 }

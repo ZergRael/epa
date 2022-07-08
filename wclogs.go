@@ -18,8 +18,7 @@ var timerStopper map[string]chan bool
 const characterTrackTickerDuration = 2 * time.Minute
 
 type TrackedCharacter struct {
-	CharID    int
-	Slug      string
+	*wclogs.Character
 	ChannelID string
 }
 
@@ -129,48 +128,47 @@ func handleTrackCharacter(name, server, region, guildID, channelID string) strin
 		return "Missing WarcraftLogs credentials setup"
 	}
 
-	charSlug := name + "-" + server + "[" + region + "]"
-	charID, err := logs[guildID].GetCharacterID(name, server, region)
-	if err != nil || charID == 0 {
-		log.Error().Str("slug", charSlug).Err(err).Msg("GetCharacterID failed")
-		return "Failed to track " + charSlug + " : character not found !"
+	char, err := logs[guildID].GetCharacter(name, server, region)
+	if err != nil || char == nil {
+		log.Error().Str("slug", char.Slug()).Err(err).Msg("GetCharacterID failed")
+		return "Failed to track " + char.Slug() + " : character not found !"
 	}
 
-	for _, char := range *trackedCharacters[guildID] {
-		if char.CharID == charID {
+	for _, c := range *trackedCharacters[guildID] {
+		if c.Character.ID == char.ID {
 			// TODO: handle already tracked as update tracking
-			log.Warn().Str("slug", charSlug).Int("charID", charID).Err(err).Msg("Already tracked")
-			return charSlug + " is already tracked"
+			log.Warn().Str("slug", char.Slug()).Int("charID", char.ID).Err(err).Msg("Already tracked")
+			return char.Slug() + " is already tracked"
 		}
 	}
 
-	reportMetadata, err := logs[guildID].GetLatestReportMetadata(charID)
+	reportMetadata, err := logs[guildID].GetLatestReportMetadata(char)
 	if err != nil {
-		log.Error().Str("slug", charSlug).Int("charID", charID).
+		log.Error().Str("slug", char.Slug()).Int("charID", char.ID).
 			Err(err).Msg("GetLatestReportMetadata failed")
-		return "Failed to track " + charSlug + " : no recent report"
+		return "Failed to track " + char.Slug() + " : no recent report"
 	}
 
-	err = storeWCLogsLatestReportForCharacter(db, charID, reportMetadata)
+	err = storeWCLogsLatestReportForCharacterID(db, char.ID, reportMetadata)
 	if err != nil {
-		log.Error().Str("slug", charSlug).Int("charID", charID).
-			Err(err).Msg("storeWCLogsLatestReportForCharacter failed")
-		return "Failed to track " + charSlug
+		log.Error().Str("slug", char.Slug()).Int("charID", char.ID).
+			Err(err).Msg("storeWCLogsLatestReportForCharacterID failed")
+		return "Failed to track " + char.Slug()
 	}
 
-	char := TrackedCharacter{CharID: charID, ChannelID: channelID, Slug: charSlug}
-	*trackedCharacters[guildID] = append(*trackedCharacters[guildID], char)
+	trackedChar := TrackedCharacter{Character: char, ChannelID: channelID}
+	*trackedCharacters[guildID] = append(*trackedCharacters[guildID], trackedChar)
 	err = storeWCLogsTrackedCharacters(db, guildID, trackedCharacters[guildID])
 	if err != nil {
-		log.Error().Str("slug", charSlug).Int("charID", charID).
+		log.Error().Str("slug", char.Slug()).Int("charID", char.ID).
 			Err(err).Msg("storeWCLogsTrackedCharacters failed")
-		return "Failed to track " + charSlug
+		return "Failed to track " + char.Slug()
 	}
 
 	// Don't record parses here as it may be too slow for discord response
 	// Parses will be recorded on next check ticker
 
-	return charSlug + " is now tracked"
+	return char.Slug() + " is now tracked"
 }
 
 func handleUntrackCharacter(name, server, region, guildID string) string {
@@ -179,15 +177,15 @@ func handleUntrackCharacter(name, server, region, guildID string) string {
 	}
 
 	charSlug := name + "-" + server + "[" + region + "]"
-	charID, err := logs[guildID].GetCharacterID(name, server, region)
+	char, err := logs[guildID].GetCharacter(name, server, region)
 	if err != nil {
 		log.Error().Str("slug", charSlug).Err(err).Msg("GetCharacterID failed")
 		return "Failed to untrack " + charSlug + " : character not found !"
 	}
 
-	charSlug += " (" + strconv.Itoa(charID) + ")"
-	for idx, char := range *trackedCharacters[guildID] {
-		if char.CharID == charID {
+	charSlug += " (" + strconv.Itoa(char.ID) + ")"
+	for idx, c := range *trackedCharacters[guildID] {
+		if c.Character.ID == char.ID {
 			*trackedCharacters[guildID] = append((*trackedCharacters[guildID])[:idx], (*trackedCharacters[guildID])[idx+1:]...)
 			log.Debug().Str("slug", charSlug).Err(err).Msg("Untracked")
 			return charSlug + " is already tracked"
@@ -206,14 +204,14 @@ func handleListTrackedCharacters(guildID string) string {
 	res := "Tracked characters :\n"
 	for _, char := range *trackedCharacters[guildID] {
 		// TODO: Add latest report EndTime from db
-		res += char.Slug + "\n"
+		res += char.Slug() + "\n"
 	}
 
 	return res
 }
 
 func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) error {
-	dbReport, err := fetchWCLogsLatestReportForCharacter(db, char.CharID)
+	dbReport, err := fetchWCLogsLatestReportForCharacterID(db, char.ID)
 	if err != nil {
 		// Missing latest report
 		// Since we should have recorded at least one on track
@@ -221,22 +219,22 @@ func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) erro
 		return err
 	}
 
-	report, err := logs[guildID].GetLatestReportMetadata(char.CharID)
+	report, err := logs[guildID].GetLatestReportMetadata(char.Character)
 	if err != nil {
 		return err
 	}
 
-	dbParses, err := fetchWCLogsParsesForCharacter(db, char.CharID)
+	dbParses, err := fetchWCLogsParsesForCharacterID(db, char.ID)
 	if err != nil {
-		log.Debug().Int("charID", char.CharID).Msg("fetchWCLogsParsesForCharacter : missing parses")
+		log.Debug().Int("charID", char.ID).Msg("fetchWCLogsParsesForCharacterID : missing parses")
 		// Missing parses
 		// This is expected, and we should assume we just need to record them
-		dbParses, err = logs[guildID].GetCurrentParsesForCharacter(char.CharID)
+		dbParses, err = logs[guildID].GetCurrentParsesForCharacter(char.Character)
 		if err != nil {
 			return err
 		}
 
-		err = storeWCLogsParsesForCharacter(db, char.CharID, dbParses)
+		err = storeWCLogsParsesForCharacterID(db, char.ID, dbParses)
 		if err != nil {
 			return err
 		}
@@ -245,23 +243,23 @@ func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) erro
 	}
 
 	if report.EndTime == dbReport.EndTime {
-		log.Debug().Int("charID", char.CharID).Str("code", report.Code).
+		log.Debug().Int("charID", char.ID).Str("code", report.Code).
 			Msg("checkWCLogsForCharacterUpdates : no latest report changes")
 		// TODO: Check if EndTime is too old and ask if we should continue tracking ?
 		return nil
 	}
 
-	log.Debug().Int("charID", char.CharID).Str("code", report.Code).
+	log.Debug().Int("charID", char.ID).Str("code", report.Code).
 		Float32("endTime", report.EndTime).Float32("dbEndTime", dbReport.EndTime).
 		Msg("checkWCLogsForCharacterUpdates : latest report changes")
 
 	// Store metadata now, too bad if we err later
-	err = storeWCLogsLatestReportForCharacter(db, char.CharID, report)
+	err = storeWCLogsLatestReportForCharacterID(db, char.ID, report)
 	if err != nil {
 		return err
 	}
 
-	parses, err := logs[guildID].GetCurrentParsesForCharacter(char.CharID)
+	parses, err := logs[guildID].GetCurrentParsesForCharacter(char.Character)
 	if err != nil {
 		return err
 	}
@@ -274,10 +272,10 @@ func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) erro
 					if ranking.RankPercent > dbRanking.RankPercent {
 						log.Info().
 							Str("metric", metric).
-							Int("charID", char.CharID).Float32("oldParse", dbRanking.RankPercent).
+							Int("charID", char.ID).Float32("oldParse", dbRanking.RankPercent).
 							Float32("newParse", ranking.RankPercent).Msg("New parse !")
 						link := "https://classic.warcraftlogs.com/reports/" + report.Code
-						content := "New parse for " + char.Slug + " on " + ranking.Encounter.Name + " !\n" +
+						content := "New parse for " + char.Slug() + " on " + ranking.Encounter.Name + " !\n" +
 							fmt.Sprintf("%.2f", dbRanking.RankPercent) + " :arrow_right: " +
 							"**" + fmt.Sprintf("%.2f", ranking.RankPercent) + "** [" + metric + "] " +
 							winEmojis[rand.Intn(len(winEmojis))] + "\n" + link
@@ -295,7 +293,7 @@ func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) erro
 	}
 
 	if newParses {
-		err = storeWCLogsParsesForCharacter(db, char.CharID, parses)
+		err = storeWCLogsParsesForCharacterID(db, char.ID, parses)
 		if err != nil {
 			return err
 		}
