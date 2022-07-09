@@ -166,7 +166,7 @@ func handleTrackCharacter(name, server, region, guildID, channelID string) strin
 	}
 
 	// Don't record parses here as it may be too slow for discord response
-	// Parses will be recorded on next check ticker
+	// ZoneParses will be recorded on next check ticker
 
 	log.Debug().Str("slug", char.Slug()).Err(err).Msg("Track successful")
 	return char.Slug() + " is now tracked"
@@ -212,9 +212,7 @@ func handleListTrackedCharacters(guildID string) string {
 func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) error {
 	dbReport, err := fetchWCLogsLatestReportForCharacterID(db, char.ID)
 	if err != nil {
-		// Missing latest report
-		// Since we should have recorded at least one on track
-		// Assume this is an error
+		// Missing latest report, we should have recorded at least one from handleTrackCharacter
 		return err
 	}
 
@@ -224,16 +222,17 @@ func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) erro
 	}
 
 	dbParses, err := fetchWCLogsParsesForCharacterID(db, char.ID)
-	if err != nil {
+	if err != nil || (*dbParses)[report.Zone.ID] == nil {
 		log.Debug().Int("charID", char.ID).Msg("fetchWCLogsParsesForCharacterID : missing parses")
-		// Missing parses
-		// This is expected, and we should assume we just need to record them
-		dbParses, err = logs[guildID].GetCurrentParsesForCharacter(char.Character)
+		// Missing parses from database for this character
+		zoneParses, err := logs[guildID].GetCurrentZoneParsesForCharacter(char.Character, report.Zone.ID)
 		if err != nil {
 			return err
 		}
 
-		err = storeWCLogsParsesForCharacterID(db, char.ID, dbParses)
+		parses := make(wclogs.Parses)
+		parses[report.Zone.ID] = *zoneParses
+		err = storeWCLogsParsesForCharacterID(db, char.ID, &parses)
 		if err != nil {
 			return err
 		}
@@ -258,31 +257,34 @@ func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) erro
 		return err
 	}
 
-	parses, err := logs[guildID].GetCurrentParsesForCharacter(char.Character)
+	zoneParses, err := logs[guildID].GetCurrentZoneParsesForCharacter(char.Character, report.Zone.ID)
 	if err != nil {
 		return err
 	}
 
 	newParses := false
-	for metric, rankings := range *parses {
+	for metric, rankings := range *zoneParses {
 		for _, ranking := range rankings.Rankings {
-			for _, dbRanking := range (*dbParses)[metric].Rankings {
+			for _, dbRanking := range (*dbParses)[report.Zone.ID][metric].Rankings {
 				if ranking.Encounter.ID == dbRanking.Encounter.ID {
 					if ranking.RankPercent > dbRanking.RankPercent {
 						log.Info().
-							Str("metric", metric).
+							Str("metric", string(metric)).
 							Int("charID", char.ID).Float32("oldParse", dbRanking.RankPercent).
 							Float32("newParse", ranking.RankPercent).Msg("New parse !")
+
 						link := "https://classic.warcraftlogs.com/reports/" + report.Code
 						content := "New parse for " + char.Slug() + " on " + ranking.Encounter.Name + " !\n" +
 							fmt.Sprintf("%.2f", dbRanking.RankPercent) + " :arrow_right: " +
-							"**" + fmt.Sprintf("%.2f", ranking.RankPercent) + "** [" + metric + "] " +
+							"**" + fmt.Sprintf("%.2f", ranking.RankPercent) + "** [" + string(metric) + "] " +
 							winEmojis[rand.Intn(len(winEmojis))] + "\n" + link
+
 						_, err := s.ChannelMessageSend(char.ChannelID, content)
-						newParses = true
 						if err != nil {
 							return err
 						}
+
+						newParses = true
 					} else if ranking.RankPercent != dbRanking.RankPercent {
 						newParses = true
 					}
@@ -292,7 +294,8 @@ func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) erro
 	}
 
 	if newParses {
-		err = storeWCLogsParsesForCharacterID(db, char.ID, parses)
+		(*dbParses)[report.Zone.ID] = *zoneParses
+		err = storeWCLogsParsesForCharacterID(db, char.ID, dbParses)
 		if err != nil {
 			return err
 		}

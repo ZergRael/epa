@@ -54,13 +54,21 @@ type ZoneRankings struct {
 	Rankings  []Ranking
 }
 
-// Parses contains ZoneRankings for multiple metrics
-type Parses map[string]ZoneRankings
+type Metric string
+
+// ZoneParses contains ZoneRankings for multiple Metric
+type ZoneParses map[Metric]ZoneRankings
+
+// Parses contains ZoneParses for multiple zones
+type Parses map[int]ZoneParses
 
 // Report represents WarcraftLogs report metadata
 type Report struct {
 	Code    string
 	EndTime float32
+	Zone    struct {
+		ID int
+	}
 }
 
 // RateLimitData contains WarcraftLogs API rate limits results, usually 3600 points per hour
@@ -207,12 +215,12 @@ func (w *WCLogs) getZones() ([]Zone, error) {
 	return resp.WorldData.Zones, nil
 }
 
-// GetCurrentParsesForCharacter queries HPS and DPS Parses for a specific Character
-func (w *WCLogs) GetCurrentParsesForCharacter(char *Character) (*Parses, error) {
+// GetCurrentZoneParsesForCharacter queries HPS and DPS ZoneParses for a specific Character and zone ID
+func (w *WCLogs) GetCurrentZoneParsesForCharacter(char *Character, zoneID int) (*ZoneParses, error) {
 	req := graphql.NewRequest(`
-    query ($id: Int!, $withHps: Boolean!) {
+    query ($id: Int!, $zoneID: Int!, $withHps: Boolean!) {
 		characterData {
-			character(id: $id) {
+			character(id: $id, zoneID: $zoneID) {
 				hpsZoneRankings: zoneRankings(metric: hps) @include(if: $withHps)
 				dpsZoneRankings: zoneRankings(metric: dps)
 			}
@@ -221,6 +229,7 @@ func (w *WCLogs) GetCurrentParsesForCharacter(char *Character) (*Parses, error) 
 `)
 
 	req.Var("id", char.ID)
+	req.Var("zoneID", zoneID)
 	req.Var("withHps", char.CanHeal())
 
 	var resp struct {
@@ -236,7 +245,7 @@ func (w *WCLogs) GetCurrentParsesForCharacter(char *Character) (*Parses, error) 
 		return nil, err
 	}
 
-	parses := make(Parses)
+	parses := make(ZoneParses)
 	parses["dps"] = resp.CharacterData.Character.DpsZoneRankings
 	if char.CanHeal() {
 		parses["hps"] = resp.CharacterData.Character.HpsZoneRankings
@@ -255,6 +264,9 @@ func (w *WCLogs) GetLatestReportMetadata(char *Character) (*Report, error) {
 					data {
 						endTime
 						code
+						zone {
+							id
+						}
 					}
 				}
 			}
