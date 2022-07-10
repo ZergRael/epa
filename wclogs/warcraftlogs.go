@@ -220,9 +220,9 @@ func (w *WCLogs) GetCurrentZoneParsesForCharacter(char *Character, zoneID int) (
 	req := graphql.NewRequest(`
     query ($id: Int!, $zoneID: Int!, $withHps: Boolean!) {
 		characterData {
-			character(id: $id, zoneID: $zoneID) {
-				hpsZoneRankings: zoneRankings(metric: hps) @include(if: $withHps)
-				dpsZoneRankings: zoneRankings(metric: dps)
+			character(id: $id) {
+				hpsZoneRankings: zoneRankings(metric: hps, zoneID: $zoneID) @include(if: $withHps)
+				dpsZoneRankings: zoneRankings(metric: dps, zoneID: $zoneID)
 			}
 		}
     }

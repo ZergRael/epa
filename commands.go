@@ -215,11 +215,11 @@ var commandsHandlers = map[string]func(s *discordgo.Session, i *discordgo.Intera
 func addCommands(guildID string) {
 	log.Debug().Str("guildID", guildID).Msg("Adding commands...")
 
-	appCommands, err := s.ApplicationCommandBulkOverwrite(s.State.User.ID, guildID, commands)
+	_, err := s.ApplicationCommandBulkOverwrite(s.State.User.ID, guildID, commands)
 	if err != nil {
 		log.Error().Err(err).Msgf("Cannot create commands")
 	}
-	log.Debug().Str("guild", guildID).Interface("commands", appCommands).Msg("Added commands")
+	log.Debug().Str("guild", guildID).Msg("Added commands")
 }
 
 func removeCommands(guildID string) {
