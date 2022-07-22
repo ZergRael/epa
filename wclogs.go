@@ -262,7 +262,22 @@ func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) erro
 		return err
 	}
 
+	newParses := compareParsesAndAnnouce(zoneParses, dbParses, report, char)
+
+	if newParses {
+		(*dbParses)[report.Zone.ID] = *zoneParses
+		err = storeWCLogsParsesForCharacterID(db, char.ID, dbParses)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func compareParsesAndAnnouce(zoneParses *wclogs.ZoneParses, dbParses *wclogs.Parses, report *wclogs.Report, char *TrackedCharacter) bool {
 	newParses := false
+
 	for metric, rankings := range *zoneParses {
 		for _, ranking := range rankings.Rankings {
 			for _, dbRanking := range (*dbParses)[report.Zone.ID][metric].Rankings {
@@ -281,7 +296,7 @@ func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) erro
 
 						_, err := s.ChannelMessageSend(char.ChannelID, content)
 						if err != nil {
-							return err
+							log.Error().Err(err).Msg("Failed to send message")
 						}
 
 						newParses = true
@@ -293,15 +308,7 @@ func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) erro
 		}
 	}
 
-	if newParses {
-		(*dbParses)[report.Zone.ID] = *zoneParses
-		err = storeWCLogsParsesForCharacterID(db, char.ID, dbParses)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return newParses
 }
 
 // setupWCLogsTicker starts the periodic check ticker, including character parses updates
