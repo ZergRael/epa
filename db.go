@@ -8,6 +8,48 @@ import (
 	"github.com/zergrael/epa/wclogs"
 )
 
+const currentDatabaseVersion = 1
+
+// upgradeDatabaseIfNecessary checks database version and tries to migrate if necessary
+func upgradeDatabaseIfNecessary() error {
+	dbVersion := 0
+
+	err := db.View(func(tx *buntdb.Tx) error {
+		val, err := tx.Get("version")
+		// Ignore not-found errors
+		if err == nil {
+			dbVersion, err = strconv.Atoi(val)
+		}
+		return err
+	})
+	if err != nil {
+		return err
+	}
+
+	if dbVersion >= currentDatabaseVersion {
+		return nil
+	}
+
+	// Migration time !
+	switch dbVersion {
+	case 0:
+		// Basically delete everything
+		db.Update(func(tx *buntdb.Tx) error {
+			return tx.DeleteAll()
+		})
+		fallthrough
+	case 1:
+		// Current version
+	}
+
+	db.Update(func(tx *buntdb.Tx) error {
+		_, _, err := tx.Set("version", strconv.Itoa(currentDatabaseVersion), nil)
+		return err
+	})
+
+	return nil
+}
+
 func fetchWCLogsCredentials(db *buntdb.DB, guildID string) (*wclogs.Credentials, error) {
 	var creds wclogs.Credentials
 	err := db.View(func(tx *buntdb.Tx) error {
