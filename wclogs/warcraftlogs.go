@@ -45,7 +45,7 @@ type Ranking struct {
 		ID   int
 		Name string
 	}
-	RankPercent float32
+	RankPercent float64
 }
 
 // ZoneRankings contains a collection of Rankings for a specific Partition
@@ -65,7 +65,7 @@ type Parses map[int]ZoneParses
 // Report represents WarcraftLogs report metadata
 type Report struct {
 	Code    string
-	EndTime float32
+	EndTime float64
 	Zone    struct {
 		ID int
 	}
@@ -74,7 +74,7 @@ type Report struct {
 // RateLimitData contains WarcraftLogs API rate limits results, usually 3600 points per hour
 type RateLimitData struct {
 	LimitPerHour        int
-	PointsSpentThisHour float32
+	PointsSpentThisHour float64
 	PointsResetIn       int
 }
 

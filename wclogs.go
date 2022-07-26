@@ -248,7 +248,7 @@ func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) erro
 	}
 
 	log.Debug().Int("charID", char.ID).Str("code", report.Code).
-		Float32("endTime", report.EndTime).Float32("dbEndTime", dbReport.EndTime).
+		Float64("endTime", report.EndTime).Float64("dbEndTime", dbReport.EndTime).
 		Msg("checkWCLogsForCharacterUpdates : latest report changes")
 
 	// Store metadata now, too bad if we err later
@@ -285,8 +285,8 @@ func compareParsesAndAnnouce(zoneParses *wclogs.ZoneParses, dbParses *wclogs.Par
 					if ranking.RankPercent > dbRanking.RankPercent {
 						log.Info().
 							Str("metric", string(metric)).
-							Int("charID", char.ID).Float32("oldParse", dbRanking.RankPercent).
-							Float32("newParse", ranking.RankPercent).Msg("New parse !")
+							Int("charID", char.ID).Float64("oldParse", dbRanking.RankPercent).
+							Float64("newParse", ranking.RankPercent).Msg("New parse !")
 
 						link := "https://classic.warcraftlogs.com/reports/" + report.Code
 						content := "New parse for " + char.Slug() + " on " + ranking.Encounter.Name + " !\n" +
