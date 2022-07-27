@@ -32,27 +32,6 @@ func guildDelete(_ *discordgo.Session, guild *discordgo.GuildDelete) {
 	destroyWCLogsForGuild(guild.ID)
 }
 
-func discordMessageHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
-	if m.Author.Bot {
-		//log.Debug().Msg("User is a bot and being ignored.")
-		return
-	}
-
-	log.Debug().Str("message", m.Content).Send()
-
-	var err error
-	log.Debug().Str("channelID", m.ChannelID).Send()
-	_, err = s.State.Channel(m.ChannelID)
-	if err != nil {
-		log.Error().Err(err).Msg("Failed to read channel details")
-		_, err = s.UserChannelCreate(m.Author.ID)
-		if err != nil {
-			log.Error().Err(err).Msg("Failed to create channel details")
-			return
-		}
-	}
-}
-
 func commandsHandler(s *discordgo.Session, interaction *discordgo.InteractionCreate) {
 	if commandFunc, ok := commandsHandlers[interaction.ApplicationCommandData().Name]; ok {
 		commandFunc(s, interaction)

@@ -72,7 +72,6 @@ func main() {
 	s.AddHandler(ready)
 	s.AddHandler(guildCreate)
 	s.AddHandler(guildDelete)
-	s.AddHandler(discordMessageHandler)
 	s.AddHandler(commandsHandler)
 
 	s.Identify.Intents = discordgo.IntentsAllWithoutPrivileged
