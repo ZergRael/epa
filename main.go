@@ -4,6 +4,7 @@ import (
 	"flag"
 	"os"
 	"os/signal"
+	"strings"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
@@ -12,9 +13,6 @@ import (
 	"github.com/tidwall/buntdb"
 	"github.com/zergrael/epa/wclogs"
 )
-
-// botToken is Discord bot access token
-var botToken string
 
 // s is global discord session
 var s *discordgo.Session
@@ -29,10 +27,21 @@ var logs map[string]*wclogs.WCLogs
 const globalCommands = false
 
 func init() {
+	// botToken is Discord bot access token
+	var botToken string
 	flag.StringVar(&botToken, "token", lookupEnvOrString("DISCORD_BOT_TOKEN", ""), "Bot discord access token")
+
+	// debug forces debug messages output
+	var debug bool
+	flag.BoolVar(&debug, "debug", lookupEnvOrBool("DEBUG", false), "Output debug messages")
+
 	flag.Parse()
 
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339})
+	level := zerolog.InfoLevel
+	if debug {
+		level = zerolog.DebugLevel
+	}
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339}).Level(level)
 
 	if botToken == "" {
 		log.Fatal().Msg("Missing --token flag / DISCORD_BOT_TOKEN env variable")
@@ -118,6 +127,15 @@ func main() {
 func lookupEnvOrString(key string, defaultVal string) string {
 	if val, ok := os.LookupEnv(key); ok {
 		return val
+	}
+
+	return defaultVal
+}
+
+// lookupEnvOrBool returns key environment variable or defaultVal
+func lookupEnvOrBool(key string, defaultVal bool) bool {
+	if val, ok := os.LookupEnv(key); ok {
+		return strings.ToLower(val) == "true" || val == "1"
 	}
 
 	return defaultVal

@@ -33,7 +33,7 @@ func instantiateWCLogsForGuild(guildID string) {
 	// WCLogs credentials
 	creds, err := fetchWCLogsCredentials(db, guildID)
 	if err != nil || creds == nil {
-		log.Debug().Err(err).Str("guildID", guildID).Msg("Cannot read WCLogs credentials for guild")
+		log.Warn().Err(err).Str("guildID", guildID).Msg("Cannot read WCLogs credentials for guild")
 		return
 	}
 
@@ -168,7 +168,7 @@ func handleTrackCharacter(name, server, region, guildID, channelID string) strin
 	// Don't record parses here as it may be too slow for discord response
 	// ZoneParses will be recorded on next check ticker
 
-	log.Debug().Str("slug", char.Slug()).Err(err).Msg("Track successful")
+	log.Info().Str("slug", char.Slug()).Err(err).Msg("Track successful")
 	return char.Slug() + " is now tracked"
 }
 
@@ -186,7 +186,7 @@ func handleUntrackCharacter(name, server, region, guildID string) string {
 	for idx, c := range *trackedCharacters[guildID] {
 		if c.Character.ID == char.ID {
 			*trackedCharacters[guildID] = append((*trackedCharacters[guildID])[:idx], (*trackedCharacters[guildID])[idx+1:]...)
-			log.Debug().Str("slug", char.Slug()).Err(err).Msg("Untrack successful")
+			log.Info().Str("slug", char.Slug()).Err(err).Msg("Untrack successful")
 			return char.Slug() + " is not tracked anymore"
 		}
 	}
@@ -223,7 +223,7 @@ func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) erro
 
 	dbParses, err := fetchWCLogsParsesForCharacterID(db, char.ID)
 	if err != nil || (*dbParses)[report.Zone.ID] == nil {
-		log.Debug().Int("charID", char.ID).Msg("fetchWCLogsParsesForCharacterID : missing parses")
+		log.Warn().Int("charID", char.ID).Msg("fetchWCLogsParsesForCharacterID : missing parses")
 		// Missing parses from database for this character
 		zoneParses, err := logs[guildID].GetCurrentZoneParsesForCharacter(char.Character, report.Zone.ID)
 		if err != nil {
@@ -247,7 +247,7 @@ func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) erro
 		return nil
 	}
 
-	log.Debug().Int("charID", char.ID).Str("code", report.Code).
+	log.Info().Int("charID", char.ID).Str("code", report.Code).
 		Float64("endTime", report.EndTime).Float64("dbEndTime", dbReport.EndTime).
 		Msg("checkWCLogsForCharacterUpdates : latest report changes")
 
