@@ -8,7 +8,7 @@ import (
 	"github.com/zergrael/epa/wclogs"
 )
 
-const currentDatabaseVersion = 1
+const currentDatabaseVersion = 2
 
 // upgradeDatabaseIfNecessary checks database version and tries to migrate if necessary
 func upgradeDatabaseIfNecessary(db *buntdb.DB) error {
@@ -18,7 +18,7 @@ func upgradeDatabaseIfNecessary(db *buntdb.DB) error {
 		val, err := tx.Get("version")
 		// Ignore not-found errors
 		if err == nil {
-			dbVersion, err = strconv.Atoi(val)
+			dbVersion, _ = strconv.Atoi(val)
 		}
 		return nil
 	})
@@ -33,12 +33,14 @@ func upgradeDatabaseIfNecessary(db *buntdb.DB) error {
 	// Migration time !
 	switch dbVersion {
 	case 0:
+		fallthrough
+	case 1:
 		// Basically delete everything
 		db.Update(func(tx *buntdb.Tx) error {
 			return tx.DeleteAll()
 		})
 		fallthrough
-	case 1:
+	case 2:
 		// Current version
 	}
 

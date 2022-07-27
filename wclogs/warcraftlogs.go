@@ -144,6 +144,7 @@ func (w *WCLogs) GetCharacter(name, server, region string) (*Character, error) {
 			character(name: $name, serverSlug: $server, serverRegion: $region) {
 				id
 				name
+				classID
 				server {
 					name
 					region {
