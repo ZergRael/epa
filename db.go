@@ -11,7 +11,7 @@ import (
 const currentDatabaseVersion = 1
 
 // upgradeDatabaseIfNecessary checks database version and tries to migrate if necessary
-func upgradeDatabaseIfNecessary() error {
+func upgradeDatabaseIfNecessary(db *buntdb.DB) error {
 	dbVersion := 0
 
 	err := db.View(func(tx *buntdb.Tx) error {
@@ -20,7 +20,7 @@ func upgradeDatabaseIfNecessary() error {
 		if err == nil {
 			dbVersion, err = strconv.Atoi(val)
 		}
-		return err
+		return nil
 	})
 	if err != nil {
 		return err
@@ -53,7 +53,7 @@ func upgradeDatabaseIfNecessary() error {
 func fetchWCLogsCredentials(db *buntdb.DB, guildID string) (*wclogs.Credentials, error) {
 	var creds wclogs.Credentials
 	err := db.View(func(tx *buntdb.Tx) error {
-		val, err := tx.Get("wclogs-creds-" + guildID)
+		val, err := tx.Get("wclogs-creds:" + guildID)
 		if err != nil {
 			return err
 		}
@@ -75,7 +75,7 @@ func storeWCLogsCredentials(db *buntdb.DB, guildID string, creds *wclogs.Credent
 	}
 
 	err = db.Update(func(tx *buntdb.Tx) error {
-		_, _, err := tx.Set("wclogs-creds-"+guildID, string(bytes), nil)
+		_, _, err := tx.Set("wclogs-creds:"+guildID, string(bytes), nil)
 		return err
 	})
 
@@ -85,7 +85,7 @@ func storeWCLogsCredentials(db *buntdb.DB, guildID string, creds *wclogs.Credent
 func fetchWCLogsLatestReportForCharacterID(db *buntdb.DB, charID int) (*wclogs.Report, error) {
 	var report wclogs.Report
 	err := db.View(func(tx *buntdb.Tx) error {
-		val, err := tx.Get("wclogs-latest-report-" + strconv.Itoa(charID))
+		val, err := tx.Get("wclogs-latest-report:" + strconv.Itoa(charID))
 		if err != nil {
 			return err
 		}
@@ -107,7 +107,7 @@ func storeWCLogsLatestReportForCharacterID(db *buntdb.DB, charID int, report *wc
 	}
 
 	err = db.Update(func(tx *buntdb.Tx) error {
-		_, _, err := tx.Set("wclogs-latest-report-"+strconv.Itoa(charID), string(bytes), nil)
+		_, _, err := tx.Set("wclogs-latest-report:"+strconv.Itoa(charID), string(bytes), nil)
 		return err
 	})
 
@@ -117,7 +117,7 @@ func storeWCLogsLatestReportForCharacterID(db *buntdb.DB, charID int, report *wc
 func fetchWCLogsTrackedCharacters(db *buntdb.DB, guildID string) (*[]TrackedCharacter, error) {
 	var characters []TrackedCharacter
 	err := db.View(func(tx *buntdb.Tx) error {
-		val, err := tx.Get("wclogs-tracked-characters-" + guildID)
+		val, err := tx.Get("wclogs-tracked-characters:" + guildID)
 		if err != nil {
 			return err
 		}
@@ -139,7 +139,7 @@ func storeWCLogsTrackedCharacters(db *buntdb.DB, guildID string, characters *[]T
 	}
 
 	err = db.Update(func(tx *buntdb.Tx) error {
-		_, _, err := tx.Set("wclogs-tracked-characters-"+guildID, string(bytes), nil)
+		_, _, err := tx.Set("wclogs-tracked-characters:"+guildID, string(bytes), nil)
 		return err
 	})
 
@@ -149,7 +149,7 @@ func storeWCLogsTrackedCharacters(db *buntdb.DB, guildID string, characters *[]T
 func fetchWCLogsParsesForCharacterID(db *buntdb.DB, charID int) (*wclogs.Parses, error) {
 	var parses wclogs.Parses
 	err := db.View(func(tx *buntdb.Tx) error {
-		val, err := tx.Get("wclogs-parses-" + strconv.Itoa(charID))
+		val, err := tx.Get("wclogs-parses:" + strconv.Itoa(charID))
 		if err != nil {
 			return err
 		}
@@ -171,7 +171,7 @@ func storeWCLogsParsesForCharacterID(db *buntdb.DB, charID int, parses *wclogs.P
 	}
 
 	err = db.Update(func(tx *buntdb.Tx) error {
-		_, _, err := tx.Set("wclogs-parses-"+strconv.Itoa(charID), string(bytes), nil)
+		_, _, err := tx.Set("wclogs-parses:"+strconv.Itoa(charID), string(bytes), nil)
 		return err
 	})
 

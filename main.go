@@ -62,7 +62,7 @@ func main() {
 		}
 	}(db)
 
-	err = upgradeDatabaseIfNecessary()
+	err = upgradeDatabaseIfNecessary(db)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to apply database migrations")
 	}
