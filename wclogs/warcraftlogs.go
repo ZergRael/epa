@@ -4,6 +4,7 @@ package wclogs
 import (
 	"context"
 	"errors"
+	"math"
 
 	"github.com/machinebox/graphql"
 	"golang.org/x/oauth2"
@@ -250,6 +251,13 @@ func (w *WCLogs) GetCurrentZoneParsesForCharacter(char *Character, zoneID int) (
 	parses["dps"] = resp.CharacterData.Character.DpsZoneRankings
 	if char.CanHeal() {
 		parses["hps"] = resp.CharacterData.Character.HpsZoneRankings
+	}
+
+	// HACK: Lower float resolution to help mitigate precision issues
+	for _, rankings := range parses {
+		for _, ranking := range rankings.Rankings {
+			ranking.RankPercent = math.Round(ranking.RankPercent*10000) / 10000
+		}
 	}
 
 	return &parses, nil
