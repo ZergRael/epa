@@ -254,9 +254,9 @@ func (w *WCLogs) GetCurrentZoneParsesForCharacter(char *Character, zoneID int) (
 	}
 
 	// HACK: Lower float resolution to help mitigate precision issues
-	for _, rankings := range parses {
-		for _, ranking := range rankings.Rankings {
-			ranking.RankPercent = math.Round(ranking.RankPercent*10000) / 10000
+	for metric, rankings := range parses {
+		for idx, ranking := range rankings.Rankings {
+			parses[metric].Rankings[idx].RankPercent = math.Round(ranking.RankPercent*10000) / 10000
 		}
 	}
 
