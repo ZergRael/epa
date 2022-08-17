@@ -113,7 +113,7 @@ var commandsHandlers = map[string]func(s *discordgo.Session, i *discordgo.Intera
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
 			Data: &discordgo.InteractionResponseData{
 				Content: response,
-				Flags:   uint64(discordgo.MessageFlagsEphemeral),
+				Flags:   discordgo.MessageFlagsEphemeral,
 			},
 		})
 
@@ -132,7 +132,7 @@ var commandsHandlers = map[string]func(s *discordgo.Session, i *discordgo.Intera
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
 			Data: &discordgo.InteractionResponseData{
 				Content: response,
-				Flags:   uint64(discordgo.MessageFlagsEphemeral),
+				Flags:   discordgo.MessageFlagsEphemeral,
 			},
 		})
 
@@ -147,7 +147,7 @@ var commandsHandlers = map[string]func(s *discordgo.Session, i *discordgo.Intera
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
 			Data: &discordgo.InteractionResponseData{
 				Content: response,
-				Flags:   uint64(discordgo.MessageFlagsEphemeral),
+				Flags:   discordgo.MessageFlagsEphemeral,
 			},
 		})
 
