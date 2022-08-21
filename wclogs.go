@@ -24,8 +24,11 @@ type TrackedCharacter struct {
 var winEmojis = []string{
 	":partying_face:",
 	":muscle:",
-	":bangbang:",
 	":chart_with_upwards_trend:",
+	":trophy:",
+	":clap:",
+	":start_struck:",
+	":crown:",
 }
 
 // instantiateWCLogsForGuild tries to fetch wclogs.Credentials from database and validate them before starting ticker
@@ -240,6 +243,13 @@ func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) erro
 		return nil
 	}
 
+	if report.Code != dbReport.Code {
+		log.Info().
+			Int("charID", char.ID).Str("code", report.Code).
+			Msg("checkWCLogsForCharacterUpdates: new report code")
+		announceNewReport(report, char)
+	}
+
 	if report.EndTime == dbReport.EndTime {
 		log.Debug().Int("charID", char.ID).Str("code", report.Code).
 			Msg("checkWCLogsForCharacterUpdates : no latest report changes")
@@ -262,7 +272,7 @@ func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) erro
 		return err
 	}
 
-	newParses := compareParsesAndAnnouce(zoneParses, dbParses, report, char)
+	newParses := compareParsesAndAnnounce(zoneParses, dbParses, report, char)
 
 	if newParses {
 		(*dbParses)[report.Zone.ID] = *zoneParses
@@ -275,7 +285,17 @@ func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) erro
 	return nil
 }
 
-func compareParsesAndAnnouce(zoneParses *wclogs.ZoneParses, dbParses *wclogs.Parses, report *wclogs.Report, char *TrackedCharacter) bool {
+func announceNewReport(report *wclogs.Report, char *TrackedCharacter) {
+	link := "https://classic.warcraftlogs.com/reports/" + report.Code
+	content := "New report detected for " + char.Slug() + " : " + link
+
+	_, err := s.ChannelMessageSend(char.ChannelID, content)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to send message")
+	}
+}
+
+func compareParsesAndAnnounce(zoneParses *wclogs.ZoneParses, dbParses *wclogs.Parses, report *wclogs.Report, char *TrackedCharacter) bool {
 	newParses := false
 
 	for metric, rankings := range *zoneParses {
