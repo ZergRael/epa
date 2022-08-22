@@ -27,7 +27,7 @@ var winEmojis = []string{
 	":chart_with_upwards_trend:",
 	":trophy:",
 	":clap:",
-	":start_struck:",
+	":star_struck:",
 	":crown:",
 }
 
