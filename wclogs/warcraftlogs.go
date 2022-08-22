@@ -181,6 +181,10 @@ func (w *WCLogs) GetCharacter(name, server, region string) (*Character, error) {
 		return nil, err
 	}
 
+	if resp.CharacterData.Character.ID == 0 {
+		return nil, errors.New("character not found")
+	}
+
 	return &Character{
 		ID:      resp.CharacterData.Character.ID,
 		Name:    resp.CharacterData.Character.Name,
