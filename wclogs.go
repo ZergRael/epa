@@ -21,7 +21,7 @@ type TrackedCharacter struct {
 	ChannelID string
 }
 
-var winEmojis = []string{
+var goodParse = []string{
 	":partying_face:",
 	":muscle:",
 	":chart_with_upwards_trend:",
@@ -29,6 +29,14 @@ var winEmojis = []string{
 	":clap:",
 	":star_struck:",
 	":crown:",
+}
+var badParse = []string{
+	"Nice try, but you suck",
+	"That was nice.. You should try harder",
+	":pleading_face:",
+	"Meeeeeeeeh",
+	"At some point, you might have more than a green parse",
+	"This is bad, but it could be worse",
 }
 
 // instantiateWCLogsForGuild tries to fetch wclogs.Credentials from database and validate them before starting ticker
@@ -308,11 +316,17 @@ func compareParsesAndAnnounce(zoneParses *wclogs.ZoneParses, dbParses *wclogs.Pa
 							Int("charID", char.ID).Float64("oldParse", dbRanking.RankPercent).
 							Float64("newParse", ranking.RankPercent).Msg("New parse !")
 
+						// TODO: Get player spec and fight ID for proper link
 						link := "https://classic.warcraftlogs.com/reports/" + report.Code
+						reaction := goodParse[rand.Intn(len(goodParse))]
+						if ranking.RankPercent < 50 {
+							reaction = badParse[rand.Intn(len(badParse))]
+						}
+
 						content := "New parse for " + char.Slug() + " on " + ranking.Encounter.Name + " !\n" +
 							fmt.Sprintf("%.2f", dbRanking.RankPercent) + " :arrow_right: " +
 							"**" + fmt.Sprintf("%.2f", ranking.RankPercent) + "** [" + string(metric) + "] " +
-							winEmojis[rand.Intn(len(winEmojis))] + "\n" + link
+							reaction + "\n" + link
 
 						_, err := s.ChannelMessageSend(char.ChannelID, content)
 						if err != nil {
