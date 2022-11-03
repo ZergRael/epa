@@ -93,6 +93,30 @@ var commands = []*discordgo.ApplicationCommand{
 		},
 	},
 	{
+		Name:        "parses",
+		Description: "Show current parses for a specific character",
+		Options: []*discordgo.ApplicationCommandOption{
+			{
+				Type:        discordgo.ApplicationCommandOptionString,
+				Name:        "character",
+				Description: "Character name",
+				Required:    true,
+			},
+			{
+				Type:        discordgo.ApplicationCommandOptionString,
+				Name:        "server",
+				Description: "Character server",
+				Required:    true,
+			},
+			{
+				Type:        discordgo.ApplicationCommandOptionString,
+				Name:        "region",
+				Description: "Character server region (EU/US)",
+				Required:    true,
+			},
+		},
+	},
+	{
 		Name:        "list-tracked-characters",
 		Description: "List WCLogs parses tracked characters",
 	},
@@ -184,6 +208,24 @@ var commandsHandlers = map[string]func(s *discordgo.Session, i *discordgo.Intera
 		region := i.ApplicationCommandData().Options[2].StringValue()
 
 		response := handleUntrackCharacter(char, server, region, i.GuildID)
+
+		err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: response,
+			},
+		})
+
+		if err != nil {
+			log.Error().Err(err).Msg("/untrack-character command response failed")
+		}
+	},
+	"parses": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+		char := i.ApplicationCommandData().Options[0].StringValue()
+		server := i.ApplicationCommandData().Options[1].StringValue()
+		region := i.ApplicationCommandData().Options[2].StringValue()
+
+		response := handleParses(char, server, region, i.GuildID)
 
 		err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,

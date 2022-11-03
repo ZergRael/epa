@@ -197,13 +197,45 @@ func handleUntrackCharacter(name, server, region, guildID string) string {
 	for idx, c := range *trackedCharacters[guildID] {
 		if c.Character.ID == char.ID {
 			*trackedCharacters[guildID] = append((*trackedCharacters[guildID])[:idx], (*trackedCharacters[guildID])[idx+1:]...)
-			log.Info().Str("slug", char.Slug()).Err(err).Msg("Untrack successful")
+			log.Info().Str("slug", char.Slug()).Msg("Untrack successful")
 			return char.Slug() + " is not tracked anymore"
 		}
 	}
 
 	log.Warn().Str("slug", char.Slug()).Err(err).Msg("Not tracked")
 	return char.Slug() + " was not tracked"
+}
+
+func handleParses(name, server, region, guildID string) string {
+	if logs[guildID] == nil {
+		return "Missing WarcraftLogs credentials setup"
+	}
+
+	char, err := logs[guildID].GetCharacter(name, server, region)
+	if err != nil {
+		log.Error().Str("slug", char.Slug()).Err(err).Msg("GetCharacterID failed")
+		return "Failed to get parses for " + char.Slug() + " : character not found !"
+	}
+
+	dbParses, err := fetchWCLogsParsesForCharacterID(db, char.ID)
+	if err != nil || dbParses == nil {
+		log.Warn().Str("slug", char.Slug()).Err(err).Msg("Not tracked")
+		return char.Slug() + " is not tracked"
+	}
+
+	content := ""
+	for _, zoneParses := range *dbParses {
+		for metric, parses := range zoneParses {
+			content += string(metric) + "\n"
+			for _, ranking := range parses.Rankings {
+				content += ranking.Encounter.Name + ": " +
+					fmt.Sprintf("%.2f", ranking.RankPercent) + "\n"
+			}
+		}
+	}
+
+	log.Info().Str("slug", char.Slug()).Msg("Sent parses")
+	return content
 }
 
 func handleListTrackedCharacters(guildID string) string {
