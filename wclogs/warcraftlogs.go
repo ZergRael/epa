@@ -60,15 +60,17 @@ type Metric string
 // ZoneParses contains ZoneRankings for multiple Metric
 type ZoneParses map[Metric]ZoneRankings
 
+type ZoneID int
+
 // Parses contains ZoneParses for multiple zones
-type Parses map[int]ZoneParses
+type Parses map[ZoneID]ZoneParses
 
 // Report represents WarcraftLogs report metadata
 type Report struct {
 	Code    string
 	EndTime float64
 	Zone    struct {
-		ID int
+		ID ZoneID
 	}
 }
 
@@ -91,6 +93,10 @@ func New(creds *Credentials, flavor Flavor, debugLogsFunc func(string)) *WCLogs 
 	uri := retailApiUri
 	switch flavor {
 	case Classic:
+		fallthrough
+	case TBC:
+		fallthrough
+	case WOTLK:
 		uri = classicApiUri
 	case Vanilla:
 		uri = vanillaApiUri
@@ -222,7 +228,7 @@ func (w *WCLogs) getZones() ([]Zone, error) {
 }
 
 // GetCurrentZoneParsesForCharacter queries HPS and DPS ZoneParses for a specific Character and zone ID
-func (w *WCLogs) GetCurrentZoneParsesForCharacter(char *Character, zoneID int) (*ZoneParses, error) {
+func (w *WCLogs) GetCurrentZoneParsesForCharacter(char *Character, zoneID ZoneID) (*ZoneParses, error) {
 	req := graphql.NewRequest(`
     query ($id: Int!, $zoneID: Int!, $withHps: Boolean!) {
 		characterData {
