@@ -228,7 +228,7 @@ func handleParses(name, server, region, guildID string) string {
 	content := ""
 	for _, zoneParses := range *dbParses {
 		for metric, parses := range zoneParses {
-			content += string(metric) + "\n"
+			content += "**" + string(metric) + "**\n"
 			for _, ranking := range parses.Rankings {
 				content += ranking.Encounter.Name + ": " +
 					fmt.Sprintf("%.2f", ranking.RankPercent) + "\n"
