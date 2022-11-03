@@ -32,11 +32,13 @@ var goodParse = []string{
 }
 var badParse = []string{
 	"Nice try, but you suck",
-	"That was nice.. You should try harder",
+	"That was nice. You should try harder ?",
 	":pleading_face:",
 	"Meeeeeeeeh",
 	"At some point, you might have more than a green parse",
 	"This is bad, but it could be worse",
+	"Better luck next time",
+	"Here, have a participation trophy :trophy:",
 }
 
 // instantiateWCLogsForGuild tries to fetch wclogs.Credentials from database and validate them before starting ticker
