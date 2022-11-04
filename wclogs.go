@@ -78,6 +78,7 @@ func instantiateWCLogsForGuild(guildID string) {
 	setupWCLogsTicker(guildID)
 }
 
+// destroyWCLogsForGuild unregisters WCLogs credentials, deletes live tracks and remove timers & tickers
 func destroyWCLogsForGuild(guildID string) {
 	// Remove tracking timer
 	if characterTrackTicker[guildID] != nil {

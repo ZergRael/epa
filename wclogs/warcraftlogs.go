@@ -16,10 +16,7 @@ import (
 
 const (
 	// authorizationUri = "https://www.warcraftlogs.com/oauth/authorize"
-	tokenUri      = "https://www.warcraftlogs.com/oauth/token"
-	retailApiUri  = "https://www.warcraftlogs.com/api/v2/client"
-	classicApiUri = "https://classic.warcraftlogs.com/api/v2/client"
-	vanillaApiUri = "https://vanilla.warcraftlogs.com/api/v2/client"
+	tokenUri = "https://www.warcraftlogs.com/oauth/token"
 )
 
 // WCLogs is the WarcraftLogs graphql API client holder
@@ -55,11 +52,13 @@ type ZoneRankings struct {
 	Rankings  []Ranking
 }
 
+// Metric is either dps or hps
 type Metric string
 
 // ZoneParses contains ZoneRankings for multiple Metric
 type ZoneParses map[Metric]ZoneRankings
 
+// ZoneID represents the raid cluster zone identifier
 type ZoneID int
 
 // Parses contains ZoneParses for multiple zones
@@ -90,20 +89,8 @@ func New(creds *Credentials, flavor Flavor, debugLogsFunc func(string)) *WCLogs 
 		AuthStyle:    oauth2.AuthStyleInHeader,
 	}
 
-	uri := retailApiUri
-	switch flavor {
-	case Classic:
-		fallthrough
-	case TBC:
-		fallthrough
-	case WOTLK:
-		uri = classicApiUri
-	case Vanilla:
-		uri = vanillaApiUri
-	}
-
 	// TODO: check context value
-	client := graphql.NewClient(uri, graphql.WithHTTPClient(c.Client(context.Background())))
+	client := graphql.NewClient(flavor.Uri(), graphql.WithHTTPClient(c.Client(context.Background())))
 	if debugLogsFunc != nil {
 		client.Log = debugLogsFunc
 	}
@@ -212,7 +199,7 @@ func (w *WCLogs) getZones() ([]Zone, error) {
 		}
     }
 `)
-	req.Var("expansion", w.flavor.LatestExpansion())
+	req.Var("expansion", w.flavor.Expansion())
 
 	var resp struct {
 		WorldData struct {
