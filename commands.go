@@ -150,7 +150,7 @@ var commandsHandlers = map[string]func(s *discordgo.Session, i *discordgo.Intera
 		clientID := i.ApplicationCommandData().Options[0].StringValue()
 		clientSecret := i.ApplicationCommandData().Options[1].StringValue()
 
-		response := handleRegisterWarcraftLogs(clientID, clientSecret, i.GuildID)
+		response := registerWarcraftLogs(clientID, clientSecret, i.GuildID)
 
 		err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
@@ -165,7 +165,7 @@ var commandsHandlers = map[string]func(s *discordgo.Session, i *discordgo.Intera
 		}
 	},
 	"unregister-warcraftlogs": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-		response := handleUnregisterWarcraftLogs(i.GuildID)
+		response := unregisterWarcraftLogs(i.GuildID)
 
 		err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
@@ -189,7 +189,7 @@ var commandsHandlers = map[string]func(s *discordgo.Session, i *discordgo.Intera
 			channel = i.ApplicationCommandData().Options[3].ChannelValue(s).ID
 		}
 
-		response := handleTrackCharacter(char, server, region, i.GuildID, channel)
+		response := trackCharacter(char, server, region, i.GuildID, channel)
 
 		err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
@@ -207,7 +207,7 @@ var commandsHandlers = map[string]func(s *discordgo.Session, i *discordgo.Intera
 		server := i.ApplicationCommandData().Options[1].StringValue()
 		region := i.ApplicationCommandData().Options[2].StringValue()
 
-		response := handleUntrackCharacter(char, server, region, i.GuildID)
+		response := untrackCharacter(char, server, region, i.GuildID)
 
 		err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
@@ -225,7 +225,7 @@ var commandsHandlers = map[string]func(s *discordgo.Session, i *discordgo.Intera
 		server := i.ApplicationCommandData().Options[1].StringValue()
 		region := i.ApplicationCommandData().Options[2].StringValue()
 
-		response := handleParses(char, server, region, i.GuildID)
+		response := currentParses(char, server, region, i.GuildID)
 
 		err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
@@ -239,7 +239,7 @@ var commandsHandlers = map[string]func(s *discordgo.Session, i *discordgo.Intera
 		}
 	},
 	"list-tracked-characters": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-		response := handleListTrackedCharacters(i.GuildID)
+		response := listTrackedCharacters(i.GuildID)
 
 		err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,

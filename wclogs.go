@@ -92,7 +92,8 @@ func destroyWCLogsForGuild(guildID string) {
 	logs[guildID] = nil
 }
 
-func handleRegisterWarcraftLogs(clientID, clientSecret, guildID string) string {
+// registerWarcraftLogs instantiates a new WCLogs with credentials for a specific guildID
+func registerWarcraftLogs(clientID, clientSecret, guildID string) string {
 	creds := &wclogs.Credentials{ClientID: clientID, ClientSecret: clientSecret}
 	w := wclogs.New(creds, wclogs.Classic, nil)
 	if !w.Check() {
@@ -126,7 +127,8 @@ func handleRegisterWarcraftLogs(clientID, clientSecret, guildID string) string {
 	return "Congrats, API credentials are valid"
 }
 
-func handleUnregisterWarcraftLogs(guildID string) string {
+// unregisterWarcraftLogs destroys WCLogs instance
+func unregisterWarcraftLogs(guildID string) string {
 	if logs[guildID] == nil {
 		return "No stored credentials"
 	}
@@ -136,7 +138,8 @@ func handleUnregisterWarcraftLogs(guildID string) string {
 	return "Unregister successful"
 }
 
-func handleTrackCharacter(name, server, region, guildID, channelID string) string {
+// trackCharacter tries to add a regular performance track on a specific character
+func trackCharacter(name, server, region, guildID, channelID string) string {
 	if logs[guildID] == nil {
 		return "Missing WarcraftLogs credentials setup"
 	}
@@ -186,7 +189,8 @@ func handleTrackCharacter(name, server, region, guildID, channelID string) strin
 	return char.Slug() + " is now tracked"
 }
 
-func handleUntrackCharacter(name, server, region, guildID string) string {
+// untrackCharacter removes a character for current tracking
+func untrackCharacter(name, server, region, guildID string) string {
 	if logs[guildID] == nil {
 		return "Missing WarcraftLogs credentials setup"
 	}
@@ -209,7 +213,9 @@ func handleUntrackCharacter(name, server, region, guildID string) string {
 	return char.Slug() + " was not tracked"
 }
 
-func handleParses(name, server, region, guildID string) string {
+// currentParses returns cached performances for a character
+// TODO: improve formatting
+func currentParses(name, server, region, guildID string) string {
 	if logs[guildID] == nil {
 		return "Missing WarcraftLogs credentials setup"
 	}
@@ -241,7 +247,8 @@ func handleParses(name, server, region, guildID string) string {
 	return content
 }
 
-func handleListTrackedCharacters(guildID string) string {
+// listTrackedCharacters returns a list of all known and tracked characters
+func listTrackedCharacters(guildID string) string {
 	if logs[guildID] == nil {
 		return "Missing WarcraftLogs credentials setup"
 	}
@@ -258,7 +265,7 @@ func handleListTrackedCharacters(guildID string) string {
 func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) error {
 	dbReport, err := fetchWCLogsLatestReportForCharacterID(db, char.ID)
 	if err != nil {
-		// Missing latest report, we should have recorded at least one from handleTrackCharacter
+		// Missing latest report, we should have recorded at least one from trackCharacter
 		return err
 	}
 
