@@ -34,7 +34,6 @@ var badParse = []string{
 	"Nice try, but you suck",
 	"That was nice. You should try harder ?",
 	":pleading_face:",
-	"Meeeeeeeeh",
 	"At some point, you might have more than a green parse",
 	"This is bad, but it could be worse",
 	"Better luck next time",
@@ -153,7 +152,7 @@ func trackCharacter(name, server, region, guildID, channelID string) string {
 	for idx, c := range *trackedCharacters[guildID] {
 		if c.Character.ID == char.ID {
 			// Remove currently tracked character, it will be added back again later
-			// hackish way to allow announce channel updates
+			// hackish way to allow update to announce channel
 			*trackedCharacters[guildID] = append((*trackedCharacters[guildID])[:idx], (*trackedCharacters[guildID])[idx+1:]...)
 			log.Warn().Str("slug", char.Slug()).Int("charID", char.ID).Err(err).Msg("Already tracked")
 		}
@@ -297,7 +296,11 @@ func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) erro
 		log.Info().
 			Int("charID", char.ID).Str("code", report.Code).
 			Msg("checkWCLogsForCharacterUpdates: new report code")
-		announceNewReport(report, char)
+
+		// Current report has to be older than stored one, anything else might indicate wclogs deletion
+		if report.EndTime > dbReport.EndTime {
+			announceNewReport(report, char)
+		}
 	}
 
 	if report.EndTime == dbReport.EndTime {
