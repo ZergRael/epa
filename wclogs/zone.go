@@ -7,8 +7,13 @@ import (
 
 // Zone represents a WoW zone
 type Zone struct {
-	ID   int
-	Name string
+	ID           int
+	Name         string
+	Difficulties []struct {
+		ID    int
+		Name  string
+		Sizes []int
+	}
 }
 
 // getZones queries a collection of Zone, this is static data for each expansion
@@ -19,6 +24,11 @@ func (w *WCLogs) getZones() ([]Zone, error) {
 			zones (expansion_id: $expansion) {
 				id
 				name
+				difficulties {
+					id
+					name
+					sizes
+				}
 			}
 		}
     }
