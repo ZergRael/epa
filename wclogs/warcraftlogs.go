@@ -55,9 +55,9 @@ func New(creds *Credentials, flavor Flavor, debugLogsFunc func(string)) *WCLogs 
 	return &w
 }
 
-// Check tries to connect to WarcraftLogs API, mostly used to validate credentials
+// Connect tries to connect to WarcraftLogs API, mostly used to validate credentials
 // TODO: it could be useful to also check rate limits here
-func (w *WCLogs) Check() bool {
+func (w *WCLogs) Connect() bool {
 	_, err := w.GetRateLimits()
 	return err == nil
 }
