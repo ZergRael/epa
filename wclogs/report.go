@@ -10,9 +10,8 @@ import (
 type Report struct {
 	Code    string
 	EndTime float64
-	Zone    struct {
-		ID ZoneID
-	}
+	ZoneID  ZoneID
+	Size    RaidSize
 }
 
 // GetLatestReportMetadata queries latest Report for a specific Character
@@ -23,10 +22,14 @@ func (w *WCLogs) GetLatestReportMetadata(char *Character) (*Report, error) {
 			character(id: $id) {
 				recentReports(limit: 1) {
 					data {
-						endTime
 						code
+						endTime
 						zone {
 							id
+						}
+						fights(killType: Kills) {
+							encounterID
+							size
 						}
 					}
 				}
@@ -41,7 +44,18 @@ func (w *WCLogs) GetLatestReportMetadata(char *Character) (*Report, error) {
 		CharacterData struct {
 			Character struct {
 				RecentReports struct {
-					Data []Report
+					Data []struct {
+						Code    string
+						EndTime float64
+						Zone    struct {
+							ID int
+						}
+						// TODO: Get fights only when needed (EndTime diff)
+						Fights []struct {
+							EncounterID int
+							Size        int
+						}
+					}
 				}
 			}
 		}
@@ -55,5 +69,13 @@ func (w *WCLogs) GetLatestReportMetadata(char *Character) (*Report, error) {
 		return nil, errors.New("no recent report")
 	}
 
-	return &resp.CharacterData.Character.RecentReports.Data[0], nil
+	report := &resp.CharacterData.Character.RecentReports.Data[0]
+	lastFight := report.Fights[len(report.Fights)-1]
+
+	return &Report{
+		Code:    report.Code,
+		EndTime: report.EndTime,
+		Size:    RaidSize(lastFight.Size),
+		ZoneID:  cachedZones.GetZoneIDForEncounter(lastFight.EncounterID),
+	}, nil
 }

@@ -7,14 +7,34 @@ import (
 
 // Zone represents a WoW zone
 type Zone struct {
-	ID           int
+	ID           ZoneID
 	Name         string
 	Difficulties []struct {
 		ID    int
 		Name  string
 		Sizes []int
 	}
+	Encounters []struct {
+		ID   int
+		Name string
+	}
 }
+
+type Zones []Zone
+
+func (Z Zones) GetZoneIDForEncounter(encounterID int) ZoneID {
+	for _, z := range Z {
+		for _, e := range z.Encounters {
+			if e.ID == encounterID {
+				return z.ID
+			}
+		}
+	}
+
+	return 0
+}
+
+var cachedZones Zones
 
 // getZones queries a collection of Zone, this is static data for each expansion
 func (w *WCLogs) getZones() ([]Zone, error) {
@@ -28,6 +48,10 @@ func (w *WCLogs) getZones() ([]Zone, error) {
 					id
 					name
 					sizes
+				}
+				encounters {
+					id
+					name
 				}
 			}
 		}
@@ -46,4 +70,14 @@ func (w *WCLogs) getZones() ([]Zone, error) {
 	}
 
 	return resp.WorldData.Zones, nil
+}
+
+func (w *WCLogs) cacheZones() error {
+	if cachedZones != nil {
+		return nil
+	}
+
+	var err error
+	cachedZones, err = w.getZones()
+	return err
 }

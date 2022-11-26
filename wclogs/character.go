@@ -3,6 +3,7 @@ package wclogs
 import (
 	"context"
 	"errors"
+	"fmt"
 	"github.com/machinebox/graphql"
 )
 
@@ -20,7 +21,7 @@ type Character struct {
 
 // Slug returns printable Character identifier
 func (t *Character) Slug() string {
-	return t.Name + " " + t.Region + "-" + t.Server
+	return fmt.Sprintf("%s %s-%s", t.Name, t.Region, t.Server)
 }
 
 // CanHeal returns true if Character should also be tracked as a healer

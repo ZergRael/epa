@@ -8,7 +8,7 @@ import (
 	"github.com/zergrael/epa/wclogs"
 )
 
-const currentDatabaseVersion = 2
+const currentDatabaseVersion = 3
 
 // upgradeDatabaseIfNecessary checks database version and tries to migrate if necessary
 func upgradeDatabaseIfNecessary(db *buntdb.DB) error {
@@ -41,6 +41,25 @@ func upgradeDatabaseIfNecessary(db *buntdb.DB) error {
 		})
 		fallthrough
 	case 2:
+		var keysToDelete []string
+		db.Update(func(tx *buntdb.Tx) error {
+			err := tx.AscendKeys("wclogs-parses:*", func(key, value string) bool {
+				keysToDelete = append(keysToDelete, key)
+				return true
+			})
+			if err != nil {
+				return err
+			}
+
+			for _, key := range keysToDelete {
+				if _, err = tx.Delete(key); err != nil {
+					return err
+				}
+			}
+
+			return err
+		})
+	case 3:
 		// Current version
 	}
 

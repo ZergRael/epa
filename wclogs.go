@@ -32,7 +32,7 @@ var goodParse = []string{
 }
 var badParse = []string{
 	"Nice try, but you suck",
-	"That was nice. You should try harder ?",
+	"That was nice. Maybe you should try harder ?",
 	":pleading_face:",
 	"At some point, you might have more than a green parse",
 	"This is bad, but it could be worse",
@@ -232,12 +232,13 @@ func currentParses(name, server, region, guildID string) string {
 	}
 
 	content := ""
-	for _, zoneParses := range *dbParses {
-		for metric, parses := range zoneParses {
-			content += "**" + string(metric) + "**\n"
-			for _, ranking := range parses.Rankings {
-				content += ranking.Encounter.Name + ": " +
-					fmt.Sprintf("%.2f", ranking.RankPercent) + "\n"
+	for _, sizeRankings := range *dbParses {
+		for size, zoneRankings := range sizeRankings {
+			for metric, parses := range zoneRankings {
+				content += "**" + string(metric) + "**\n"
+				for _, ranking := range parses.Rankings {
+					content += fmt.Sprintf("%s (%d) : %.2f\n", ranking.Encounter.Name, size, ranking.RankPercent)
+				}
 			}
 		}
 	}
@@ -274,17 +275,31 @@ func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) erro
 	}
 
 	dbParses, err := fetchWCLogsParsesForCharacterID(db, char.ID)
-	if err != nil || (*dbParses)[report.Zone.ID] == nil {
+	if err != nil || (*dbParses)[report.ZoneID] == nil || (*dbParses)[report.ZoneID][report.Size] == nil {
 		log.Warn().Int("charID", char.ID).Msg("fetchWCLogsParsesForCharacterID : missing parses")
 		// Missing parses from database for this character
-		zoneParses, err := logs[guildID].GetCurrentZoneParsesForCharacter(char.Character, report.Zone.ID)
+		log.Info().Int("charID", char.ID).Str("code", report.Code).
+			Float64("endTime", report.EndTime).Float64("dbEndTime", dbReport.EndTime).
+			Int("zoneID", int(report.ZoneID)).Int("size", int(report.Size)).
+			Msg("checkWCLogsForCharacterUpdates : get first parses")
+		metricRankings, err := logs[guildID].GetMetricRankingsForCharacter(char.Character, report.ZoneID, report.Size)
 		if err != nil {
 			return err
 		}
 
-		parses := make(wclogs.Parses)
-		parses[report.Zone.ID] = *zoneParses
-		err = storeWCLogsParsesForCharacterID(db, char.ID, &parses)
+		if dbParses == nil {
+			dbParses = &wclogs.Parses{}
+		}
+		if (*dbParses)[report.ZoneID] == nil {
+			(*dbParses)[report.ZoneID] = wclogs.SizeRankings{}
+		}
+
+		err = storeWCLogsLatestReportForCharacterID(db, char.ID, report)
+		if err != nil {
+			return err
+		}
+		(*dbParses)[report.ZoneID][report.Size] = *metricRankings
+		err = storeWCLogsParsesForCharacterID(db, char.ID, dbParses)
 		if err != nil {
 			return err
 		}
@@ -295,7 +310,7 @@ func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) erro
 	if report.Code != dbReport.Code {
 		log.Info().
 			Int("charID", char.ID).Str("code", report.Code).
-			Msg("checkWCLogsForCharacterUpdates: new report code")
+			Msg("checkWCLogsForCharacterUpdates : new report code")
 
 		// Current report has to be older than stored one, anything else might indicate wclogs deletion
 		if report.EndTime > dbReport.EndTime {
@@ -304,7 +319,7 @@ func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) erro
 	}
 
 	if report.EndTime == dbReport.EndTime {
-		log.Debug().Int("charID", char.ID).Str("code", report.Code).
+		log.Debug().Int("charID", char.ID).Str("code", report.Code).Float64("endTime", report.EndTime).
 			Msg("checkWCLogsForCharacterUpdates : no latest report changes")
 		// TODO: Check if EndTime is too old and ask if we should continue tracking ?
 		return nil
@@ -312,6 +327,7 @@ func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) erro
 
 	log.Info().Int("charID", char.ID).Str("code", report.Code).
 		Float64("endTime", report.EndTime).Float64("dbEndTime", dbReport.EndTime).
+		Int("zoneID", int(report.ZoneID)).Int("size", int(report.Size)).
 		Msg("checkWCLogsForCharacterUpdates : latest report changes")
 
 	// Store metadata now, too bad if we err later
@@ -320,15 +336,15 @@ func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) erro
 		return err
 	}
 
-	zoneParses, err := logs[guildID].GetCurrentZoneParsesForCharacter(char.Character, report.Zone.ID)
+	metricRankings, err := logs[guildID].GetMetricRankingsForCharacter(char.Character, report.ZoneID, report.Size)
 	if err != nil {
 		return err
 	}
 
-	newParses := compareParsesAndAnnounce(zoneParses, dbParses, report, char)
+	newParses := compareParsesAndAnnounce(metricRankings, dbParses, report, char)
 
 	if newParses {
-		(*dbParses)[report.Zone.ID] = *zoneParses
+		(*dbParses)[report.ZoneID][report.Size] = *metricRankings
 		err = storeWCLogsParsesForCharacterID(db, char.ID, dbParses)
 		if err != nil {
 			return err
@@ -348,12 +364,12 @@ func announceNewReport(report *wclogs.Report, char *TrackedCharacter) {
 	}
 }
 
-func compareParsesAndAnnounce(zoneParses *wclogs.ZoneParses, dbParses *wclogs.Parses, report *wclogs.Report, char *TrackedCharacter) bool {
+func compareParsesAndAnnounce(metricRankings *wclogs.MetricRankings, dbParses *wclogs.Parses, report *wclogs.Report, char *TrackedCharacter) bool {
 	newParses := false
 
-	for metric, rankings := range *zoneParses {
+	for metric, rankings := range *metricRankings {
 		for _, ranking := range rankings.Rankings {
-			for _, dbRanking := range (*dbParses)[report.Zone.ID][metric].Rankings {
+			for _, dbRanking := range (*dbParses)[report.ZoneID][report.Size][metric].Rankings {
 				if ranking.Encounter.ID == dbRanking.Encounter.ID {
 					if ranking.RankPercent > dbRanking.RankPercent {
 						log.Info().
@@ -361,22 +377,7 @@ func compareParsesAndAnnounce(zoneParses *wclogs.ZoneParses, dbParses *wclogs.Pa
 							Int("charID", char.ID).Float64("oldParse", dbRanking.RankPercent).
 							Float64("newParse", ranking.RankPercent).Msg("New parse !")
 
-						// TODO: Get player spec and fight ID for proper link
-						link := "https://classic.warcraftlogs.com/reports/" + report.Code
-						reaction := goodParse[rand.Intn(len(goodParse))]
-						if ranking.RankPercent < 50 {
-							reaction = badParse[rand.Intn(len(badParse))]
-						}
-
-						content := "New parse for " + char.Slug() + " on " + ranking.Encounter.Name + " !\n" +
-							fmt.Sprintf("%.2f", dbRanking.RankPercent) + " :arrow_right: " +
-							"**" + fmt.Sprintf("%.2f", ranking.RankPercent) + "** [" + string(metric) + "] " +
-							reaction + "\n" + link
-
-						_, err := s.ChannelMessageSend(char.ChannelID, content)
-						if err != nil {
-							log.Error().Err(err).Msg("Failed to send message")
-						}
+						announceParse(&ranking, &dbRanking, report, metric, char)
 
 						newParses = true
 					} else if ranking.RankPercent != dbRanking.RankPercent {
@@ -388,6 +389,27 @@ func compareParsesAndAnnounce(zoneParses *wclogs.ZoneParses, dbParses *wclogs.Pa
 	}
 
 	return newParses
+}
+
+func announceParse(ranking *wclogs.Ranking, dbRanking *wclogs.Ranking, report *wclogs.Report, metric wclogs.Metric, char *TrackedCharacter) {
+	// TODO: Get player spec and fight ID for proper link
+	link := "https://classic.warcraftlogs.com/reports/" + report.Code
+	reaction := goodParse[rand.Intn(len(goodParse))]
+	if ranking.RankPercent < 50 {
+		reaction = badParse[rand.Intn(len(badParse))]
+	}
+
+	content := fmt.Sprintf("New parse for %s on %s[%d] !\n"+
+		"%s :arrow_right: **%s** [%s] %s\n"+
+		"%s", char.Slug(), ranking.Encounter.Name, report.Size,
+		fmt.Sprintf("%.2f", dbRanking.RankPercent),
+		fmt.Sprintf("%.2f", ranking.RankPercent),
+		string(metric), reaction, link)
+
+	_, err := s.ChannelMessageSend(char.ChannelID, content)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to send message")
+	}
 }
 
 // setupWCLogsTicker starts the periodic check ticker, including character parses updates

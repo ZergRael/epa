@@ -59,7 +59,16 @@ func New(creds *Credentials, flavor Flavor, debugLogsFunc func(string)) *WCLogs 
 // TODO: it could be useful to also check rate limits here
 func (w *WCLogs) Connect() bool {
 	_, err := w.GetRateLimits()
-	return err == nil
+	if err != nil {
+		return false
+	}
+
+	err = w.cacheZones()
+	if err != nil {
+		return false
+	}
+
+	return true
 }
 
 // GetRateLimits queries RateLimitData from WarcraftLogs API

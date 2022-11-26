@@ -9,17 +9,23 @@ import (
 // ZoneID represents the raid cluster zone identifier
 type ZoneID int
 
-// Parses contains ZoneParses for multiple zones
-type Parses map[ZoneID]ZoneParses
+// Parses contains SizeRankings for multiple ZoneID
+type Parses map[ZoneID]SizeRankings
+
+// RaidSize is 10/25/40 raid group size
+type RaidSize int
+
+// SizeRankings contains MetricRankings for multiple RaidSize
+type SizeRankings map[RaidSize]MetricRankings
 
 // Metric is either dps or hps
 type Metric string
 
-// ZoneParses contains ZoneRankings for multiple Metric
-type ZoneParses map[Metric]ZoneRankings
+// MetricRankings contains Rankings for multiple Metric
+type MetricRankings map[Metric]PartitionRankings
 
-// ZoneRankings contains a collection of Rankings for a specific Partition
-type ZoneRankings struct {
+// PartitionRankings contains a collection of Rankings for a specific Partition
+type PartitionRankings struct {
 	Partition int
 	Rankings  []Ranking
 }
@@ -33,14 +39,14 @@ type Ranking struct {
 	RankPercent float64
 }
 
-// GetCurrentZoneParsesForCharacter queries HPS and DPS ZoneParses for a specific Character and zone ID
-func (w *WCLogs) GetCurrentZoneParsesForCharacter(char *Character, zoneID ZoneID) (*ZoneParses, error) {
+// GetMetricRankingsForCharacter queries HPS and DPS ZoneParses for a specific Character, zone ID and raid size
+func (w *WCLogs) GetMetricRankingsForCharacter(char *Character, zoneID ZoneID, size RaidSize) (*MetricRankings, error) {
 	req := graphql.NewRequest(`
-    query ($id: Int!, $zoneID: Int!, $withHps: Boolean!) {
+    query ($id: Int!, $zoneID: Int!, $size: Int!, $withHps: Boolean!) {
 		characterData {
 			character(id: $id) {
-				hpsZoneRankings: zoneRankings(metric: hps, zoneID: $zoneID) @include(if: $withHps)
-				dpsZoneRankings: zoneRankings(metric: dps, zoneID: $zoneID)
+				hpsZoneRankings: zoneRankings(metric: hps, zoneID: $zoneID, size: $size) @include(if: $withHps)
+				dpsZoneRankings: zoneRankings(metric: dps, zoneID: $zoneID, size: $size)
 			}
 		}
     }
@@ -48,13 +54,14 @@ func (w *WCLogs) GetCurrentZoneParsesForCharacter(char *Character, zoneID ZoneID
 
 	req.Var("id", char.ID)
 	req.Var("zoneID", zoneID)
+	req.Var("size", size)
 	req.Var("withHps", char.CanHeal())
 
 	var resp struct {
 		CharacterData struct {
 			Character struct {
-				HpsZoneRankings ZoneRankings
-				DpsZoneRankings ZoneRankings
+				HpsZoneRankings PartitionRankings
+				DpsZoneRankings PartitionRankings
 			}
 		}
 	}
@@ -63,7 +70,7 @@ func (w *WCLogs) GetCurrentZoneParsesForCharacter(char *Character, zoneID ZoneID
 		return nil, err
 	}
 
-	parses := make(ZoneParses)
+	parses := make(MetricRankings)
 	parses["dps"] = resp.CharacterData.Character.DpsZoneRankings
 	if char.CanHeal() {
 		parses["hps"] = resp.CharacterData.Character.HpsZoneRankings
@@ -72,7 +79,7 @@ func (w *WCLogs) GetCurrentZoneParsesForCharacter(char *Character, zoneID ZoneID
 	// HACK: Lower float resolution to help mitigate precision issues
 	for metric, rankings := range parses {
 		for idx, ranking := range rankings.Rankings {
-			parses[metric].Rankings[idx].RankPercent = math.Round(ranking.RankPercent*10000) / 10000
+			parses[metric].Rankings[idx].RankPercent = math.Round(ranking.RankPercent*1000) / 1000
 		}
 	}
 
