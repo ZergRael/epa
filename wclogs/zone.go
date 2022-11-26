@@ -12,7 +12,7 @@ type Zone struct {
 	Difficulties []struct {
 		ID    int
 		Name  string
-		Sizes []int
+		Sizes []RaidSize
 	}
 	Encounters []struct {
 		ID   int
@@ -20,13 +20,25 @@ type Zone struct {
 	}
 }
 
+func (z Zone) IsRelevant() bool {
+	for _, difficulty := range z.Difficulties {
+		for _, size := range difficulty.Sizes {
+			if size >= minSizeTrackedEncounter {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
 type Zones []Zone
 
-func (Z Zones) GetZoneIDForEncounter(encounterID int) ZoneID {
-	for _, z := range Z {
-		for _, e := range z.Encounters {
-			if e.ID == encounterID {
-				return z.ID
+func (z Zones) GetZoneIDForEncounter(encounterID int) ZoneID {
+	for _, zone := range z {
+		for _, encounter := range zone.Encounters {
+			if encounter.ID == encounterID {
+				return zone.ID
 			}
 		}
 	}
@@ -37,7 +49,7 @@ func (Z Zones) GetZoneIDForEncounter(encounterID int) ZoneID {
 var cachedZones Zones
 
 // getZones queries a collection of Zone, this is static data for each expansion
-func (w *WCLogs) getZones() ([]Zone, error) {
+func (w *WCLogs) getZones() (Zones, error) {
 	req := graphql.NewRequest(`
     query ($expansion: Int!) {
 		worldData {
@@ -69,7 +81,14 @@ func (w *WCLogs) getZones() ([]Zone, error) {
 		return nil, err
 	}
 
-	return resp.WorldData.Zones, nil
+	var zones Zones
+	for _, zone := range resp.WorldData.Zones {
+		if zone.IsRelevant() {
+			zones = append(zones, zone)
+		}
+	}
+
+	return zones, nil
 }
 
 func (w *WCLogs) cacheZones() error {

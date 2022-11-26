@@ -12,6 +12,13 @@ type ZoneID int
 // Parses contains SizeRankings for multiple ZoneID
 type Parses map[ZoneID]SizeRankings
 
+func (p *Parses) MergeMetricRankings(zoneID ZoneID, size RaidSize, rankings *MetricRankings) {
+	if (*p)[zoneID] == nil {
+		(*p)[zoneID] = SizeRankings{}
+	}
+	(*p)[zoneID][size] = *rankings
+}
+
 // RaidSize is 10/25/40 raid group size
 type RaidSize int
 
@@ -70,16 +77,34 @@ func (w *WCLogs) GetMetricRankingsForCharacter(char *Character, zoneID ZoneID, s
 		return nil, err
 	}
 
-	parses := make(MetricRankings)
-	parses["dps"] = resp.CharacterData.Character.DpsZoneRankings
+	metricRankings := make(MetricRankings)
+	metricRankings["dps"] = resp.CharacterData.Character.DpsZoneRankings
 	if char.CanHeal() {
-		parses["hps"] = resp.CharacterData.Character.HpsZoneRankings
+		metricRankings["hps"] = resp.CharacterData.Character.HpsZoneRankings
 	}
 
 	// HACK: Lower float resolution to help mitigate precision issues
-	for metric, rankings := range parses {
+	for metric, rankings := range metricRankings {
 		for idx, ranking := range rankings.Rankings {
-			parses[metric].Rankings[idx].RankPercent = math.Round(ranking.RankPercent*1000) / 1000
+			metricRankings[metric].Rankings[idx].RankPercent = math.Round(ranking.RankPercent*1000) / 1000
+		}
+	}
+
+	return &metricRankings, nil
+}
+
+// GetParsesForCharacter queries all Parses for a specific Character
+func (w *WCLogs) GetParsesForCharacter(char *Character) (*Parses, error) {
+	var parses = make(Parses)
+	for _, zone := range cachedZones {
+		for _, difficulty := range zone.Difficulties {
+			for _, size := range difficulty.Sizes {
+				metricRankings, err := w.GetMetricRankingsForCharacter(char, zone.ID, size)
+				if err != nil {
+					return nil, err
+				}
+				parses.MergeMetricRankings(zone.ID, size, metricRankings)
+			}
 		}
 	}
 

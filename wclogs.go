@@ -14,7 +14,7 @@ var characterTrackTicker map[string]*time.Ticker
 var timerStopper map[string]chan bool
 
 // TODO: Adjust ticker duration based on latest report age
-const characterTrackTickerDuration = 2 * time.Minute
+const characterTrackTickerDuration = 1 * time.Minute
 
 type TrackedCharacter struct {
 	*wclogs.Character
@@ -181,8 +181,8 @@ func trackCharacter(name, server, region, guildID, channelID string) string {
 		return "Failed to track " + char.Slug()
 	}
 
-	// Don't record parses here as it may be too slow for discord response
-	// ZoneParses will be recorded on next check ticker
+	// Record parses in goroutine as it may be too slow for discord response
+	go getAndStoreAllWCLogsParsesForCharacter(guildID, &trackedChar)
 
 	log.Info().Str("slug", char.Slug()).Err(err).Msg("Track successful")
 	return char.Slug() + " is now tracked"
@@ -262,52 +262,31 @@ func listTrackedCharacters(guildID string) string {
 	return res
 }
 
+func getAndStoreAllWCLogsParsesForCharacter(guildID string, char *TrackedCharacter) error {
+	parses, err := logs[guildID].GetParsesForCharacter(char.Character)
+	if err != nil {
+		return err
+	}
+
+	return storeWCLogsParsesForCharacterID(db, char.ID, parses)
+}
+
 // checkWCLogsForCharacterUpdates gets the latest report metadata and updates parses if necessary
 func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) error {
+	// Get the latest report metadata from DB
 	dbReport, err := fetchWCLogsLatestReportForCharacterID(db, char.ID)
 	if err != nil {
 		// Missing latest report, we should have recorded at least one from trackCharacter
 		return err
 	}
 
+	// Get the latest report metadata from WCLogs
 	report, err := logs[guildID].GetLatestReportMetadata(char.Character)
 	if err != nil {
 		return err
 	}
 
-	dbParses, err := fetchWCLogsParsesForCharacterID(db, char.ID)
-	if err != nil || (*dbParses)[report.ZoneID] == nil || (*dbParses)[report.ZoneID][report.Size] == nil {
-		log.Warn().Int("charID", char.ID).Msg("fetchWCLogsParsesForCharacterID : missing parses")
-		// Missing parses from database for this character
-		log.Info().Int("charID", char.ID).Str("code", report.Code).
-			Float64("endTime", report.EndTime).Float64("dbEndTime", dbReport.EndTime).
-			Int("zoneID", int(report.ZoneID)).Int("size", int(report.Size)).
-			Msg("checkWCLogsForCharacterUpdates : get first parses")
-		metricRankings, err := logs[guildID].GetMetricRankingsForCharacter(char.Character, report.ZoneID, report.Size)
-		if err != nil {
-			return err
-		}
-
-		if dbParses == nil {
-			dbParses = &wclogs.Parses{}
-		}
-		if (*dbParses)[report.ZoneID] == nil {
-			(*dbParses)[report.ZoneID] = wclogs.SizeRankings{}
-		}
-
-		err = storeWCLogsLatestReportForCharacterID(db, char.ID, report)
-		if err != nil {
-			return err
-		}
-		(*dbParses)[report.ZoneID][report.Size] = *metricRankings
-		err = storeWCLogsParsesForCharacterID(db, char.ID, dbParses)
-		if err != nil {
-			return err
-		}
-
-		return nil
-	}
-
+	// Announce new report if code diff and end time is later than DB end time
 	if report.Code != dbReport.Code {
 		log.Info().
 			Int("charID", char.ID).Str("code", report.Code).
@@ -319,6 +298,7 @@ func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) erro
 		}
 	}
 
+	// Bail if end times are equal
 	if report.EndTime == dbReport.EndTime {
 		log.Debug().Int("charID", char.ID).Str("code", report.Code).Float64("endTime", report.EndTime).
 			Msg("checkWCLogsForCharacterUpdates : no latest report changes")
@@ -326,26 +306,41 @@ func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) erro
 		return nil
 	}
 
+	// Get the latest full report from WCLogs
+	fullReport, err := logs[guildID].GetLatestReport(char.Character)
+	if err != nil {
+		return err
+	}
+
 	log.Info().Int("charID", char.ID).Str("code", report.Code).
-		Float64("endTime", report.EndTime).Float64("dbEndTime", dbReport.EndTime).
-		Int("zoneID", int(report.ZoneID)).Int("size", int(report.Size)).
+		Float64("endTime", fullReport.EndTime).Float64("dbEndTime", dbReport.EndTime).
+		Int("zoneID", int(fullReport.ZoneID)).Int("size", int(fullReport.Size)).
 		Msg("checkWCLogsForCharacterUpdates : latest report changes")
 
-	// Store metadata now, too bad if we err later
+	// Store new report in DB
 	err = storeWCLogsLatestReportForCharacterID(db, char.ID, report)
 	if err != nil {
 		return err
 	}
 
-	metricRankings, err := logs[guildID].GetMetricRankingsForCharacter(char.Character, report.ZoneID, report.Size)
+	// Get parses from DB
+	dbParses, err := fetchWCLogsParsesForCharacterID(db, char.ID)
+	if err != nil || dbParses == nil {
+		dbParses = &wclogs.Parses{}
+	}
+
+	// Get report zone/size specific parses from WCLogs
+	metricRankings, err := logs[guildID].GetMetricRankingsForCharacter(char.Character, fullReport.ZoneID, fullReport.Size)
 	if err != nil {
 		return err
 	}
 
-	newParses := compareParsesAndAnnounce(metricRankings, dbParses, report, char)
+	// Compare and announce if necessary
+	newParses := compareParsesAndAnnounce(metricRankings, dbParses, fullReport, char)
 
+	// Merge parses into DB
 	if newParses {
-		(*dbParses)[report.ZoneID][report.Size] = *metricRankings
+		dbParses.MergeMetricRankings(fullReport.ZoneID, fullReport.Size, metricRankings)
 		err = storeWCLogsParsesForCharacterID(db, char.ID, dbParses)
 		if err != nil {
 			return err
@@ -356,7 +351,7 @@ func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) erro
 }
 
 // announceNewReport formats and sends a new report announcement
-func announceNewReport(report *wclogs.Report, char *TrackedCharacter) {
+func announceNewReport(report *wclogs.ReportMetadata, char *TrackedCharacter) {
 	link := "https://classic.warcraftlogs.com/reports/" + report.Code
 	content := "New report detected for " + char.Slug() + " : " + link
 
@@ -368,8 +363,11 @@ func announceNewReport(report *wclogs.Report, char *TrackedCharacter) {
 
 // compareParsesAndAnnounce iterates over rankings to find a new parse and announce it there is an improvement
 func compareParsesAndAnnounce(metricRankings *wclogs.MetricRankings, dbParses *wclogs.Parses, report *wclogs.Report, char *TrackedCharacter) bool {
-	newParses := false
+	if (*dbParses)[report.ZoneID] == nil || (*dbParses)[report.ZoneID][report.Size] == nil {
+		return true
+	}
 
+	newParses := false
 	for metric, rankings := range *metricRankings {
 		for _, ranking := range rankings.Rankings {
 			for _, dbRanking := range (*dbParses)[report.ZoneID][report.Size][metric].Rankings {

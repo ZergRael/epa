@@ -103,8 +103,8 @@ func storeWCLogsCredentials(db *buntdb.DB, guildID string, creds *wclogs.Credent
 	return err
 }
 
-func fetchWCLogsLatestReportForCharacterID(db *buntdb.DB, charID int) (*wclogs.Report, error) {
-	var report wclogs.Report
+func fetchWCLogsLatestReportForCharacterID(db *buntdb.DB, charID int) (*wclogs.ReportMetadata, error) {
+	var report wclogs.ReportMetadata
 	err := db.View(func(tx *buntdb.Tx) error {
 		val, err := tx.Get("wclogs-latest-report:" + strconv.Itoa(charID))
 		if err != nil {
@@ -121,7 +121,7 @@ func fetchWCLogsLatestReportForCharacterID(db *buntdb.DB, charID int) (*wclogs.R
 	return &report, nil
 }
 
-func storeWCLogsLatestReportForCharacterID(db *buntdb.DB, charID int, report *wclogs.Report) error {
+func storeWCLogsLatestReportForCharacterID(db *buntdb.DB, charID int, report *wclogs.ReportMetadata) error {
 	bytes, err := json.Marshal(report)
 	if err != nil {
 		return err

@@ -16,6 +16,8 @@ const (
 	tokenUri = "https://www.warcraftlogs.com/oauth/token"
 )
 
+const minSizeTrackedEncounter = 10
+
 // WCLogs is the WarcraftLogs graphql API client holder
 type WCLogs struct {
 	client *graphql.Client

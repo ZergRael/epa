@@ -6,7 +6,13 @@ import (
 	"github.com/machinebox/graphql"
 )
 
-// Report represents WarcraftLogs report metadata
+// ReportMetadata represents WarcraftLogs report metadata
+type ReportMetadata struct {
+	Code    string
+	EndTime float64
+}
+
+// Report represents WarcraftLogs report including metadata and latest kill-fight
 type Report struct {
 	Code    string
 	EndTime float64
@@ -15,7 +21,55 @@ type Report struct {
 }
 
 // GetLatestReportMetadata queries latest Report for a specific Character
-func (w *WCLogs) GetLatestReportMetadata(char *Character) (*Report, error) {
+func (w *WCLogs) GetLatestReportMetadata(char *Character) (*ReportMetadata, error) {
+	req := graphql.NewRequest(`
+    query ($id: Int!) {
+		characterData {
+			character(id: $id) {
+				recentReports(limit: 1) {
+					data {
+						code
+						endTime
+					}
+				}
+			}
+		}
+    }
+`)
+
+	req.Var("id", char.ID)
+
+	var resp struct {
+		CharacterData struct {
+			Character struct {
+				RecentReports struct {
+					Data []struct {
+						Code    string
+						EndTime float64
+					}
+				}
+			}
+		}
+	}
+
+	if err := w.client.Run(context.Background(), req, &resp); err != nil {
+		return nil, err
+	}
+
+	if len(resp.CharacterData.Character.RecentReports.Data) < 1 {
+		return nil, errors.New("no recent report")
+	}
+
+	report := &resp.CharacterData.Character.RecentReports.Data[0]
+
+	return &ReportMetadata{
+		Code:    report.Code,
+		EndTime: report.EndTime,
+	}, nil
+}
+
+// GetLatestReport queries latest Report for a specific Character
+func (w *WCLogs) GetLatestReport(char *Character) (*Report, error) {
 	req := graphql.NewRequest(`
     query ($id: Int!) {
 		characterData {
