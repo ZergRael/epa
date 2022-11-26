@@ -262,6 +262,7 @@ func listTrackedCharacters(guildID string) string {
 	return res
 }
 
+// checkWCLogsForCharacterUpdates gets the latest report metadata and updates parses if necessary
 func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) error {
 	dbReport, err := fetchWCLogsLatestReportForCharacterID(db, char.ID)
 	if err != nil {
@@ -354,6 +355,7 @@ func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) erro
 	return nil
 }
 
+// announceNewReport formats and sends a new report announcement
 func announceNewReport(report *wclogs.Report, char *TrackedCharacter) {
 	link := "https://classic.warcraftlogs.com/reports/" + report.Code
 	content := "New report detected for " + char.Slug() + " : " + link
@@ -364,6 +366,7 @@ func announceNewReport(report *wclogs.Report, char *TrackedCharacter) {
 	}
 }
 
+// compareParsesAndAnnounce iterates over rankings to find a new parse and announce it there is an improvement
 func compareParsesAndAnnounce(metricRankings *wclogs.MetricRankings, dbParses *wclogs.Parses, report *wclogs.Report, char *TrackedCharacter) bool {
 	newParses := false
 
@@ -391,6 +394,7 @@ func compareParsesAndAnnounce(metricRankings *wclogs.MetricRankings, dbParses *w
 	return newParses
 }
 
+// announceParse formats and sends a new parse announcement
 func announceParse(ranking *wclogs.Ranking, dbRanking *wclogs.Ranking, report *wclogs.Report, metric wclogs.Metric, char *TrackedCharacter) {
 	// TODO: Get player spec and fight ID for proper link
 	link := "https://classic.warcraftlogs.com/reports/" + report.Code
