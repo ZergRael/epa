@@ -287,6 +287,7 @@ func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) erro
 	}
 
 	// Announce new report if code diff and end time is later than DB end time
+	// TODO: Check end time diff first instead of code, threshold of 10s is probably fine
 	if report.Code != dbReport.Code {
 		log.Info().
 			Int("charID", char.ID).Str("code", report.Code).
@@ -322,6 +323,8 @@ func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) erro
 	if err != nil {
 		return err
 	}
+
+	// TODO: Scan report for more tracked characters
 
 	// Get parses from DB
 	dbParses, err := fetchWCLogsParsesForCharacterID(db, char.ID)
