@@ -1,4 +1,4 @@
-FROM golang:1.18-alpine AS build
+FROM golang:1.19-alpine AS build
 
 WORKDIR /app
 
@@ -10,7 +10,7 @@ COPY . ./
 
 RUN go build -o /epa
 
-FROM alpine:3.16
+FROM alpine:latest
 
 WORKDIR /
 
