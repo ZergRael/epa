@@ -182,9 +182,14 @@ func trackCharacter(name, server, region, guildID, channelID string) string {
 	}
 
 	// Record parses in goroutine as it may be too slow for discord response
-	go getAndStoreAllWCLogsParsesForCharacter(guildID, &trackedChar)
+	go func() {
+		err := getAndStoreAllWCLogsParsesForCharacter(guildID, &trackedChar)
+		if err != nil {
+			log.Error().Err(err).Str("slug", char.Slug()).Msg("Failed to get all parses")
+		}
+	}()
 
-	log.Info().Str("slug", char.Slug()).Err(err).Msg("Track successful")
+	log.Info().Str("slug", char.Slug()).Msg("Track successful")
 	return char.Slug() + " is now tracked"
 }
 
