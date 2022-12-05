@@ -183,7 +183,7 @@ func trackCharacter(name, server, region, guildID, channelID string) string {
 
 	// Record parses in goroutine as it may be too slow for discord response
 	go func() {
-		err := getAndStoreAllWCLogsParsesForCharacter(guildID, &trackedChar)
+		_, err := getAndStoreAllWCLogsParsesForCharacter(guildID, &trackedChar)
 		if err != nil {
 			log.Error().Err(err).Str("slug", char.Slug()).Msg("Failed to get all parses")
 		}
@@ -275,13 +275,18 @@ func listTrackedCharacters(guildID string) string {
 	return res
 }
 
-func getAndStoreAllWCLogsParsesForCharacter(guildID string, char *TrackedCharacter) error {
+func getAndStoreAllWCLogsParsesForCharacter(guildID string, char *TrackedCharacter) (*wclogs.Parses, error) {
 	parses, err := logs[guildID].GetParsesForCharacter(char.Character)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return storeWCLogsParsesForCharacterID(db, char.ID, parses)
+	err = storeWCLogsParsesForCharacterID(db, char.ID, parses)
+	if err != nil {
+		return nil, err
+	}
+
+	return parses, nil
 }
 
 // checkWCLogsForCharacterUpdates gets the latest report metadata and updates parses if necessary
@@ -306,6 +311,16 @@ func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) erro
 			Msg("checkWCLogsForCharacterUpdates : no end time report changes")
 		// TODO: Check if EndTime is too old and ask if we should continue tracking ?
 		return nil
+	}
+
+	// Get parses from DB
+	dbParses, err := fetchWCLogsParsesForCharacterID(db, char.ID)
+	if err != nil || dbParses == nil {
+		// Missing parses, full refresh
+		dbParses, err = getAndStoreAllWCLogsParsesForCharacter(guildID, char)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Announce new report if code diff and end time is later than DB end time
@@ -338,12 +353,6 @@ func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) erro
 	}
 
 	// TODO: Scan report for more tracked characters
-
-	// Get parses from DB
-	dbParses, err := fetchWCLogsParsesForCharacterID(db, char.ID)
-	if err != nil || dbParses == nil {
-		dbParses = &wclogs.Parses{}
-	}
 
 	// Get report zone/size specific parses from WCLogs
 	metricRankings, err := logs[guildID].GetMetricRankingsForCharacter(char.Character, fullReport.ZoneID, fullReport.Size)
