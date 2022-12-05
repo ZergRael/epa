@@ -154,8 +154,8 @@ func storeWCLogsLatestReportForCharacterID(db *buntdb.DB, charID int, report *wc
 	return err
 }
 
-func fetchWCLogsTrackedCharacters(db *buntdb.DB, guildID string) (*[]TrackedCharacter, error) {
-	var characters []TrackedCharacter
+func fetchWCLogsTrackedCharacters(db *buntdb.DB, guildID string) ([]*TrackedCharacter, error) {
+	var characters []*TrackedCharacter
 	err := db.View(func(tx *buntdb.Tx) error {
 		val, err := tx.Get("wclogs-tracked-characters:" + guildID)
 		if err != nil {
@@ -169,11 +169,11 @@ func fetchWCLogsTrackedCharacters(db *buntdb.DB, guildID string) (*[]TrackedChar
 		return nil, err
 	}
 
-	return &characters, nil
+	return characters, nil
 }
 
-func storeWCLogsTrackedCharacters(db *buntdb.DB, guildID string, characters *[]TrackedCharacter) error {
-	bytes, err := json.Marshal(*characters)
+func storeWCLogsTrackedCharacters(db *buntdb.DB, guildID string, characters []*TrackedCharacter) error {
+	bytes, err := json.Marshal(characters)
 	if err != nil {
 		return err
 	}

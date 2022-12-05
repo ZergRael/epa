@@ -127,7 +127,7 @@ var commandsHandlers = map[string]func(s *discordgo.Session, i *discordgo.Intera
 		response := "Hello there\n"
 		if logs[i.GuildID] != nil {
 			response += "WarcraftLogs engine is running, currently tracking " +
-				strconv.Itoa(len(*trackedCharacters[i.GuildID])) +
+				strconv.Itoa(len(trackedCharacters[i.GuildID])) +
 				" characters, see /track-character command to add more."
 		} else {
 			response += "WarcraftLogs is disabled, see /register-warcraftlogs command as an admin"

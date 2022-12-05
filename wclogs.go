@@ -9,7 +9,7 @@ import (
 	"github.com/zergrael/epa/wclogs"
 )
 
-var trackedCharacters map[string]*[]TrackedCharacter
+var trackedCharacters map[string][]*TrackedCharacter
 var characterTrackTicker map[string]*time.Ticker
 var timerStopper map[string]chan bool
 
@@ -42,6 +42,7 @@ var badParse = []string{
 
 // instantiateWCLogsForGuild tries to fetch wclogs.Credentials from database and validate them before starting ticker
 func instantiateWCLogsForGuild(guildID string) {
+	log.Debug().Str("guildID", guildID).Msg("instantiateWCLogsForGuild")
 	// WCLogs credentials
 	creds, err := fetchWCLogsCredentials(db, guildID)
 	if err != nil || creds == nil {
@@ -64,13 +65,13 @@ func instantiateWCLogsForGuild(guildID string) {
 	logs[guildID] = w
 
 	if trackedCharacters == nil {
-		trackedCharacters = make(map[string]*[]TrackedCharacter)
+		trackedCharacters = make(map[string][]*TrackedCharacter)
 	}
 	trackedCharacters[guildID], err = fetchWCLogsTrackedCharacters(db, guildID)
 	if err != nil {
 		log.Warn().Err(err).Msg("No currently tracked characters")
-		characters := make([]TrackedCharacter, 0)
-		trackedCharacters[guildID] = &characters
+		characters := make([]*TrackedCharacter, 0)
+		trackedCharacters[guildID] = characters
 	}
 
 	// Setup tracking timer
@@ -79,6 +80,7 @@ func instantiateWCLogsForGuild(guildID string) {
 
 // destroyWCLogsForGuild unregisters WCLogs credentials, deletes live tracks and remove timers & tickers
 func destroyWCLogsForGuild(guildID string) {
+	log.Debug().Str("guildID", guildID).Msg("destroyWCLogsForGuild")
 	// Remove tracking timer
 	if characterTrackTicker[guildID] != nil {
 		characterTrackTicker[guildID].Stop()
@@ -93,6 +95,7 @@ func destroyWCLogsForGuild(guildID string) {
 
 // registerWarcraftLogs instantiates a new WCLogs with credentials for a specific guildID
 func registerWarcraftLogs(clientID, clientSecret, guildID string) string {
+	log.Debug().Str("guildID", guildID).Msg("registerWarcraftLogs")
 	creds := &wclogs.Credentials{ClientID: clientID, ClientSecret: clientSecret}
 	w := wclogs.New(creds, wclogs.Classic, nil)
 	if !w.Connect() {
@@ -103,14 +106,14 @@ func registerWarcraftLogs(clientID, clientSecret, guildID string) string {
 	logs[guildID] = w
 
 	if trackedCharacters == nil {
-		trackedCharacters = make(map[string]*[]TrackedCharacter)
+		trackedCharacters = make(map[string][]*TrackedCharacter)
 	}
 	var err error
 	trackedCharacters[guildID], err = fetchWCLogsTrackedCharacters(db, guildID)
 	if err != nil {
 		log.Warn().Err(err).Msg("No currently tracked characters")
-		characters := make([]TrackedCharacter, 0)
-		trackedCharacters[guildID] = &characters
+		characters := make([]*TrackedCharacter, 0)
+		trackedCharacters[guildID] = characters
 	}
 
 	log.Info().Str("guildID", guildID).Msg("WCLogs instance successful")
@@ -128,6 +131,7 @@ func registerWarcraftLogs(clientID, clientSecret, guildID string) string {
 
 // unregisterWarcraftLogs destroys WCLogs instance
 func unregisterWarcraftLogs(guildID string) string {
+	log.Debug().Str("guildID", guildID).Msg("unregisterWarcraftLogs")
 	if logs[guildID] == nil {
 		return "No stored credentials"
 	}
@@ -139,6 +143,8 @@ func unregisterWarcraftLogs(guildID string) string {
 
 // trackCharacter tries to add a regular performance track on a specific character
 func trackCharacter(name, server, region, guildID, channelID string) string {
+	log.Debug().Str("name", name).Str("server", server).Str("region", "region").
+		Str("guildID", guildID).Str("channelID", channelID).Msg("trackCharacter")
 	if logs[guildID] == nil {
 		return "Missing WarcraftLogs credentials setup"
 	}
@@ -149,11 +155,11 @@ func trackCharacter(name, server, region, guildID, channelID string) string {
 		return "Failed to track " + char.Slug() + " : character not found !"
 	}
 
-	for idx, c := range *trackedCharacters[guildID] {
+	for idx, c := range trackedCharacters[guildID] {
 		if c.Character.ID == char.ID {
 			// Remove currently tracked character, it will be added back again later
 			// hackish way to allow update to announce channel
-			*trackedCharacters[guildID] = append((*trackedCharacters[guildID])[:idx], (*trackedCharacters[guildID])[idx+1:]...)
+			trackedCharacters[guildID] = append(trackedCharacters[guildID][:idx], trackedCharacters[guildID][idx+1:]...)
 			log.Warn().Str("slug", char.Slug()).Int("charID", char.ID).Err(err).Msg("Already tracked")
 		}
 	}
@@ -172,8 +178,8 @@ func trackCharacter(name, server, region, guildID, channelID string) string {
 		return "Failed to track " + char.Slug()
 	}
 
-	trackedChar := TrackedCharacter{Character: char, ChannelID: channelID}
-	*trackedCharacters[guildID] = append(*trackedCharacters[guildID], trackedChar)
+	trackedChar := &TrackedCharacter{Character: char, ChannelID: channelID}
+	trackedCharacters[guildID] = append(trackedCharacters[guildID], trackedChar)
 	err = storeWCLogsTrackedCharacters(db, guildID, trackedCharacters[guildID])
 	if err != nil {
 		log.Error().Str("slug", char.Slug()).Int("charID", char.ID).
@@ -183,7 +189,7 @@ func trackCharacter(name, server, region, guildID, channelID string) string {
 
 	// Record parses in goroutine as it may be too slow for discord response
 	go func() {
-		_, err := getAndStoreAllWCLogsParsesForCharacter(guildID, &trackedChar)
+		_, err := getAndStoreAllWCLogsParsesForCharacter(guildID, trackedChar)
 		if err != nil {
 			log.Error().Err(err).Str("slug", char.Slug()).Msg("Failed to get all parses")
 		}
@@ -195,6 +201,8 @@ func trackCharacter(name, server, region, guildID, channelID string) string {
 
 // untrackCharacter removes a character for current tracking
 func untrackCharacter(name, server, region, guildID string) string {
+	log.Debug().Str("name", name).Str("server", server).Str("region", "region").
+		Str("guildID", guildID).Msg("untrackCharacter")
 	if logs[guildID] == nil {
 		return "Missing WarcraftLogs credentials setup"
 	}
@@ -205,9 +213,9 @@ func untrackCharacter(name, server, region, guildID string) string {
 		return "Failed to untrack " + char.Slug() + " : character not found !"
 	}
 
-	for idx, c := range *trackedCharacters[guildID] {
+	for idx, c := range trackedCharacters[guildID] {
 		if c.Character.ID == char.ID {
-			*trackedCharacters[guildID] = append((*trackedCharacters[guildID])[:idx], (*trackedCharacters[guildID])[idx+1:]...)
+			trackedCharacters[guildID] = append(trackedCharacters[guildID][:idx], trackedCharacters[guildID][idx+1:]...)
 			log.Info().Str("slug", char.Slug()).Msg("Untrack successful")
 			return char.Slug() + " is not tracked anymore"
 		}
@@ -219,6 +227,8 @@ func untrackCharacter(name, server, region, guildID string) string {
 
 // currentParses returns cached performances for a character
 func currentParses(name, server, region, guildID string) map[string][]string {
+	log.Debug().Str("name", name).Str("server", server).Str("region", "region").
+		Str("guildID", guildID).Msg("currentParses")
 	if logs[guildID] == nil {
 		//return "Missing WarcraftLogs credentials setup"
 		return nil
@@ -262,12 +272,13 @@ func currentParses(name, server, region, guildID string) map[string][]string {
 
 // listTrackedCharacters returns a list of all known and tracked characters
 func listTrackedCharacters(guildID string) string {
+	log.Debug().Str("guildID", guildID).Msg("listTrackedCharacters")
 	if logs[guildID] == nil {
 		return "Missing WarcraftLogs credentials setup"
 	}
 
 	res := "Tracked characters :\n"
-	for _, char := range *trackedCharacters[guildID] {
+	for _, char := range trackedCharacters[guildID] {
 		// TODO: Add latest report EndTime from db
 		res += char.Slug() + "\n"
 	}
@@ -276,6 +287,7 @@ func listTrackedCharacters(guildID string) string {
 }
 
 func getAndStoreAllWCLogsParsesForCharacter(guildID string, char *TrackedCharacter) (*wclogs.Parses, error) {
+	log.Debug().Str("guildID", guildID).Msg("getAndStoreAllWCLogsParsesForCharacter")
 	parses, err := logs[guildID].GetParsesForCharacter(char.Character)
 	if err != nil {
 		return nil, err
@@ -314,7 +326,7 @@ func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) erro
 	if report.EndTime.Unix() == dbReport.EndTime.Unix() {
 		log.Debug().Int("charID", char.ID).Str("slug", char.Slug()).
 			Str("code", report.Code).Int64("endTime", report.EndTime.UnixMilli()).
-			Msg("checkWCLogsForCharacterUpdates : no end time report changes")
+			Msg("No end time report changes")
 		// TODO: Check if EndTime is too old and ask if we should continue tracking ?
 		return nil
 	}
@@ -334,7 +346,7 @@ func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) erro
 	if report.Code != dbReport.Code {
 		log.Info().
 			Int("charID", char.ID).Str("slug", char.Slug()).Str("code", report.Code).
-			Msg("checkWCLogsForCharacterUpdates : new report code")
+			Msg("New report code")
 
 		// Current report has to be older than stored one, anything else might indicate wclogs deletion
 		if report.EndTime.After(dbReport.EndTime) {
@@ -351,7 +363,7 @@ func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) erro
 	log.Info().Int("charID", char.ID).Str("slug", char.Slug()).Str("code", report.Code).
 		Int64("endTime", fullReport.EndTime.UnixMilli()).Int64("dbEndTime", dbReport.EndTime.UnixMilli()).
 		Int("zoneID", int(fullReport.ZoneID)).Int("size", int(fullReport.Size)).
-		Msg("checkWCLogsForCharacterUpdates : latest report changes")
+		Msg("Latest report changes")
 
 	// Store new report in DB
 	err = storeWCLogsLatestReportForCharacterID(db, char.ID, report)
@@ -377,6 +389,7 @@ func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) erro
 
 // announceNewReport formats and sends a new report announcement
 func announceNewReport(report *wclogs.ReportMetadata, char *TrackedCharacter) {
+	log.Debug().Str("code", report.Code).Str("slug", char.Slug()).Msg("announceNewReport")
 	link := "https://classic.warcraftlogs.com/reports/" + report.Code
 	content := "New report for " + char.Slug() + " : " + link
 
@@ -388,6 +401,7 @@ func announceNewReport(report *wclogs.ReportMetadata, char *TrackedCharacter) {
 
 // compareParsesAndAnnounce iterates over rankings to find a new parse and announce it there is an improvement
 func compareParsesAndAnnounce(metricRankings *wclogs.MetricRankings, dbParses *wclogs.Parses, report *wclogs.Report, char *TrackedCharacter) {
+	log.Debug().Str("code", report.Code).Str("slug", char.Slug()).Msg("compareParsesAndAnnounce")
 	if (*dbParses)[report.ZoneID] == nil || (*dbParses)[report.ZoneID][report.Size] == nil {
 		return
 	}
@@ -412,6 +426,7 @@ func compareParsesAndAnnounce(metricRankings *wclogs.MetricRankings, dbParses *w
 
 // announceParse formats and sends a new parse announcement
 func announceParse(ranking *wclogs.Ranking, dbRanking *wclogs.Ranking, report *wclogs.Report, metric wclogs.Metric, char *TrackedCharacter) {
+	log.Debug().Str("code", report.Code).Str("slug", char.Slug()).Msg("announceParse")
 	// TODO: Get player spec and fight ID for proper link
 	link := "https://classic.warcraftlogs.com/reports/" + report.Code
 	reaction := goodParse[rand.Intn(len(goodParse))]
@@ -450,8 +465,8 @@ func setupWCLogsTicker(guildID string) {
 				return
 			case <-characterTrackTicker[guildID].C:
 				log.Debug().Str("guildID", guildID).Msg("Tick")
-				for _, char := range *trackedCharacters[guildID] {
-					err := checkWCLogsForCharacterUpdates(guildID, &char)
+				for _, char := range trackedCharacters[guildID] {
+					err := checkWCLogsForCharacterUpdates(guildID, char)
 					if err != nil {
 						log.Error().Err(err).Msg("Failed to checkWCLogsForCharacterUpdates in wclogs ticker")
 					}
