@@ -293,9 +293,13 @@ func getAndStoreAllWCLogsParsesForCharacter(guildID string, char *TrackedCharact
 func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) error {
 	// Get the latest report metadata from DB
 	dbReport, err := fetchWCLogsLatestReportForCharacterID(db, char.ID)
-	if err != nil {
-		// Missing latest report, we should have recorded at least one from trackCharacter
-		return err
+	if err != nil || dbReport == nil {
+		// Missing latest report
+		report, err := logs[guildID].GetLatestReportMetadata(char.Character)
+		if err != nil {
+			return err
+		}
+		return storeWCLogsLatestReportForCharacterID(db, char.ID, report)
 	}
 
 	// Get the latest report metadata from WCLogs
@@ -445,7 +449,7 @@ func setupWCLogsTicker(guildID string) {
 				for _, char := range *trackedCharacters[guildID] {
 					err := checkWCLogsForCharacterUpdates(guildID, &char)
 					if err != nil {
-						log.Error().Err(err).Msg("checkWCLogsForCharacterUpdates")
+						log.Error().Err(err).Msg("Failed to checkWCLogsForCharacterUpdates in wclogs ticker")
 					}
 				}
 			}
