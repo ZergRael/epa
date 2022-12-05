@@ -225,13 +225,37 @@ var commandsHandlers = map[string]func(s *discordgo.Session, i *discordgo.Intera
 		server := i.ApplicationCommandData().Options[1].StringValue()
 		region := i.ApplicationCommandData().Options[2].StringValue()
 
-		response := currentParses(char, server, region, i.GuildID)
+		data := &discordgo.InteractionResponseData{
+			Content: "Failed to get parses",
+		}
+
+		content := currentParses(char, server, region, i.GuildID)
+		if content != nil {
+			var fields []*discordgo.MessageEmbedField
+			for header, rows := range content {
+				var value string
+				for _, row := range rows {
+					value += row + "\n"
+				}
+				fields = append(fields, &discordgo.MessageEmbedField{
+					Name:   header,
+					Value:  value,
+					Inline: true,
+				})
+			}
+			data = &discordgo.InteractionResponseData{
+				Embeds: []*discordgo.MessageEmbed{
+					{
+						Type:   discordgo.EmbedTypeRich,
+						Fields: fields,
+					},
+				},
+			}
+		}
 
 		err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
-			Data: &discordgo.InteractionResponseData{
-				Content: response,
-			},
+			Data: data,
 		})
 
 		if err != nil {

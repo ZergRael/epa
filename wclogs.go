@@ -213,31 +213,39 @@ func untrackCharacter(name, server, region, guildID string) string {
 }
 
 // currentParses returns cached performances for a character
-// TODO: improve formatting
-func currentParses(name, server, region, guildID string) string {
+func currentParses(name, server, region, guildID string) map[string][]string {
 	if logs[guildID] == nil {
-		return "Missing WarcraftLogs credentials setup"
+		//return "Missing WarcraftLogs credentials setup"
+		return nil
 	}
 
 	char, err := logs[guildID].GetCharacter(name, server, region)
 	if err != nil {
 		log.Error().Str("slug", char.Slug()).Err(err).Msg("GetCharacterID failed")
-		return "Failed to get parses for " + char.Slug() + " : character not found !"
+		//return "Failed to get parses for " + char.Slug() + " : character not found !"
+		return nil
 	}
 
 	dbParses, err := fetchWCLogsParsesForCharacterID(db, char.ID)
 	if err != nil || dbParses == nil {
 		log.Warn().Str("slug", char.Slug()).Err(err).Msg("Not tracked")
-		return char.Slug() + " is not tracked"
+		//return char.Slug() + " is not tracked"
+		return nil
 	}
 
-	content := ""
+	var content = make(map[string][]string)
+	content["Boss"] = []string{}
+
 	for _, sizeRankings := range *dbParses {
 		for size, zoneRankings := range sizeRankings {
 			for metric, parses := range zoneRankings {
-				content += "**" + string(metric) + "**\n"
+				header := fmt.Sprintf("%d-%s", size, metric)
 				for _, ranking := range parses.Rankings {
-					content += fmt.Sprintf("%s (%d) : %.2f\n", ranking.Encounter.Name, size, ranking.RankPercent)
+					if !arrayContains(content["Boss"], ranking.Encounter.Name) {
+						content["Boss"] = append(content["Boss"], ranking.Encounter.Name)
+					}
+
+					content[header] = append(content[header], fmt.Sprintf("%.2f", ranking.RankPercent))
 				}
 			}
 		}
