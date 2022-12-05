@@ -291,10 +291,12 @@ func getAndStoreAllWCLogsParsesForCharacter(guildID string, char *TrackedCharact
 
 // checkWCLogsForCharacterUpdates gets the latest report metadata and updates parses if necessary
 func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) error {
+	log.Debug().Int("charID", char.ID).Str("slug", char.Slug()).Msg("checkWCLogsForCharacterUpdates")
 	// Get the latest report metadata from DB
 	dbReport, err := fetchWCLogsLatestReportForCharacterID(db, char.ID)
 	if err != nil || dbReport == nil {
-		// Missing latest report
+		// Missing initial report
+		log.Debug().Int("charID", char.ID).Str("slug", char.Slug()).Msg("Missing initial report")
 		report, err := logs[guildID].GetLatestReportMetadata(char.Character)
 		if err != nil {
 			return err
@@ -310,8 +312,8 @@ func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) erro
 
 	// Bail if end times are equal at second precision
 	if report.EndTime.Unix() == dbReport.EndTime.Unix() {
-		log.Debug().Int("charID", char.ID).Str("code", report.Code).
-			Int64("endTime", report.EndTime.UnixMilli()).
+		log.Debug().Int("charID", char.ID).Str("slug", char.Slug()).
+			Str("code", report.Code).Int64("endTime", report.EndTime.UnixMilli()).
 			Msg("checkWCLogsForCharacterUpdates : no end time report changes")
 		// TODO: Check if EndTime is too old and ask if we should continue tracking ?
 		return nil
@@ -320,7 +322,8 @@ func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) erro
 	// Get parses from DB
 	dbParses, err := fetchWCLogsParsesForCharacterID(db, char.ID)
 	if err != nil || dbParses == nil {
-		// Missing parses, full refresh
+		// Missing initial parses
+		log.Debug().Int("charID", char.ID).Str("slug", char.Slug()).Msg("Missing initial parses")
 		dbParses, err = getAndStoreAllWCLogsParsesForCharacter(guildID, char)
 		if err != nil {
 			return err
@@ -330,7 +333,7 @@ func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) erro
 	// Announce new report if code diff and end time is later than DB end time
 	if report.Code != dbReport.Code {
 		log.Info().
-			Int("charID", char.ID).Str("code", report.Code).
+			Int("charID", char.ID).Str("slug", char.Slug()).Str("code", report.Code).
 			Msg("checkWCLogsForCharacterUpdates : new report code")
 
 		// Current report has to be older than stored one, anything else might indicate wclogs deletion
@@ -345,7 +348,7 @@ func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) erro
 		return err
 	}
 
-	log.Info().Int("charID", char.ID).Str("code", report.Code).
+	log.Info().Int("charID", char.ID).Str("slug", char.Slug()).Str("code", report.Code).
 		Int64("endTime", fullReport.EndTime.UnixMilli()).Int64("dbEndTime", dbReport.EndTime.UnixMilli()).
 		Int("zoneID", int(fullReport.ZoneID)).Int("size", int(fullReport.Size)).
 		Msg("checkWCLogsForCharacterUpdates : latest report changes")
@@ -446,6 +449,7 @@ func setupWCLogsTicker(guildID string) {
 			case <-timerStopper[guildID]:
 				return
 			case <-characterTrackTicker[guildID].C:
+				log.Debug().Str("guildID", guildID).Msg("Tick")
 				for _, char := range *trackedCharacters[guildID] {
 					err := checkWCLogsForCharacterUpdates(guildID, &char)
 					if err != nil {
