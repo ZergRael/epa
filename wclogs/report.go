@@ -4,18 +4,19 @@ import (
 	"context"
 	"errors"
 	"github.com/machinebox/graphql"
+	"time"
 )
 
 // ReportMetadata represents WarcraftLogs report metadata
 type ReportMetadata struct {
 	Code    string
-	EndTime float64
+	EndTime time.Time
 }
 
 // Report represents WarcraftLogs report including metadata and latest kill-fight
 type Report struct {
 	Code    string
-	EndTime float64
+	EndTime time.Time
 	ZoneID  ZoneID
 	Size    RaidSize
 }
@@ -64,7 +65,7 @@ func (w *WCLogs) GetLatestReportMetadata(char *Character) (*ReportMetadata, erro
 
 	return &ReportMetadata{
 		Code:    report.Code,
-		EndTime: report.EndTime,
+		EndTime: time.UnixMilli(int64(report.EndTime)),
 	}, nil
 }
 
@@ -128,7 +129,7 @@ func (w *WCLogs) GetLatestReport(char *Character) (*Report, error) {
 
 	return &Report{
 		Code:    report.Code,
-		EndTime: report.EndTime,
+		EndTime: time.UnixMilli(int64(report.EndTime)),
 		Size:    RaidSize(lastFight.Size),
 		ZoneID:  cachedZones.GetZoneIDForEncounter(lastFight.EncounterID),
 	}, nil

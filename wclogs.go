@@ -294,25 +294,25 @@ func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) erro
 		return err
 	}
 
+	// Bail if end times are equal at second precision
+	if report.EndTime.Unix() == dbReport.EndTime.Unix() {
+		log.Debug().Int("charID", char.ID).Str("code", report.Code).
+			Int64("endTime", report.EndTime.UnixMilli()).
+			Msg("checkWCLogsForCharacterUpdates : no end time report changes")
+		// TODO: Check if EndTime is too old and ask if we should continue tracking ?
+		return nil
+	}
+
 	// Announce new report if code diff and end time is later than DB end time
-	// TODO: Check end time diff first instead of code, threshold of 10s is probably fine
 	if report.Code != dbReport.Code {
 		log.Info().
 			Int("charID", char.ID).Str("code", report.Code).
 			Msg("checkWCLogsForCharacterUpdates : new report code")
 
 		// Current report has to be older than stored one, anything else might indicate wclogs deletion
-		if report.EndTime > dbReport.EndTime {
+		if report.EndTime.After(dbReport.EndTime) {
 			announceNewReport(report, char)
 		}
-	}
-
-	// Bail if end times are equal
-	if report.EndTime == dbReport.EndTime {
-		log.Debug().Int("charID", char.ID).Str("code", report.Code).Float64("endTime", report.EndTime).
-			Msg("checkWCLogsForCharacterUpdates : no latest report changes")
-		// TODO: Check if EndTime is too old and ask if we should continue tracking ?
-		return nil
 	}
 
 	// Get the latest full report from WCLogs
@@ -322,7 +322,7 @@ func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) erro
 	}
 
 	log.Info().Int("charID", char.ID).Str("code", report.Code).
-		Float64("endTime", fullReport.EndTime).Float64("dbEndTime", dbReport.EndTime).
+		Int64("endTime", fullReport.EndTime.UnixMilli()).Int64("dbEndTime", dbReport.EndTime.UnixMilli()).
 		Int("zoneID", int(fullReport.ZoneID)).Int("size", int(fullReport.Size)).
 		Msg("checkWCLogsForCharacterUpdates : latest report changes")
 
@@ -347,24 +347,17 @@ func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) erro
 	}
 
 	// Compare and announce if necessary
-	newParses := compareParsesAndAnnounce(metricRankings, dbParses, fullReport, char)
+	compareParsesAndAnnounce(metricRankings, dbParses, fullReport, char)
 
 	// Merge parses into DB
-	if newParses {
-		dbParses.MergeMetricRankings(fullReport.ZoneID, fullReport.Size, metricRankings)
-		err = storeWCLogsParsesForCharacterID(db, char.ID, dbParses)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
+	dbParses.MergeMetricRankings(fullReport.ZoneID, fullReport.Size, metricRankings)
+	return storeWCLogsParsesForCharacterID(db, char.ID, dbParses)
 }
 
 // announceNewReport formats and sends a new report announcement
 func announceNewReport(report *wclogs.ReportMetadata, char *TrackedCharacter) {
 	link := "https://classic.warcraftlogs.com/reports/" + report.Code
-	content := "New report detected for " + char.Slug() + " : " + link
+	content := "New report for " + char.Slug() + " : " + link
 
 	_, err := s.ChannelMessageSend(char.ChannelID, content)
 	if err != nil {
@@ -373,34 +366,27 @@ func announceNewReport(report *wclogs.ReportMetadata, char *TrackedCharacter) {
 }
 
 // compareParsesAndAnnounce iterates over rankings to find a new parse and announce it there is an improvement
-func compareParsesAndAnnounce(metricRankings *wclogs.MetricRankings, dbParses *wclogs.Parses, report *wclogs.Report, char *TrackedCharacter) bool {
+func compareParsesAndAnnounce(metricRankings *wclogs.MetricRankings, dbParses *wclogs.Parses, report *wclogs.Report, char *TrackedCharacter) {
 	if (*dbParses)[report.ZoneID] == nil || (*dbParses)[report.ZoneID][report.Size] == nil {
-		return true
+		return
 	}
 
-	newParses := false
 	for metric, rankings := range *metricRankings {
 		for _, ranking := range rankings.Rankings {
 			for _, dbRanking := range (*dbParses)[report.ZoneID][report.Size][metric].Rankings {
 				if ranking.Encounter.ID == dbRanking.Encounter.ID {
-					if ranking.RankPercent > dbRanking.RankPercent {
+					if ranking.RankPercent-dbRanking.RankPercent > 0.1 {
 						log.Info().
 							Str("metric", string(metric)).
 							Int("charID", char.ID).Float64("oldParse", dbRanking.RankPercent).
 							Float64("newParse", ranking.RankPercent).Msg("New parse !")
 
 						announceParse(&ranking, &dbRanking, report, metric, char)
-
-						newParses = true
-					} else if ranking.RankPercent != dbRanking.RankPercent {
-						newParses = true
 					}
 				}
 			}
 		}
 	}
-
-	return newParses
 }
 
 // announceParse formats and sends a new parse announcement
@@ -412,11 +398,9 @@ func announceParse(ranking *wclogs.Ranking, dbRanking *wclogs.Ranking, report *w
 		reaction = badParse[rand.Intn(len(badParse))]
 	}
 
-	content := fmt.Sprintf("New parse for %s on %s[%d] !\n"+
-		"%s :arrow_right: **%s** [%s] %s\n"+
+	content := fmt.Sprintf("New parse for %s on %s(%d) : %s :arrow_right: **%s** [%s] %s\n"+
 		"%s", char.Slug(), ranking.Encounter.Name, report.Size,
-		fmt.Sprintf("%.2f", dbRanking.RankPercent),
-		fmt.Sprintf("%.2f", ranking.RankPercent),
+		fmt.Sprintf("%.2f", dbRanking.RankPercent), fmt.Sprintf("%.2f", ranking.RankPercent),
 		string(metric), reaction, link)
 
 	_, err := s.ChannelMessageSend(char.ChannelID, content)
