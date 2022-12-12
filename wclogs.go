@@ -267,20 +267,14 @@ func currentParses(name, server, region, guildID string) (map[string][]string, s
 	return content, ""
 }
 
-// listTrackedCharacters returns a list of all known and tracked characters
-func listTrackedCharacters(guildID string) string {
+// getTrackedCharacters returns an array of all known and tracked characters for a guildID
+func getTrackedCharacters(guildID string) ([]*TrackedCharacter, string) {
 	log.Debug().Str("guildID", guildID).Msg("listTrackedCharacters")
 	if logs[guildID] == nil {
-		return "Missing WarcraftLogs credentials setup"
+		return nil, "Missing WarcraftLogs credentials setup"
 	}
 
-	res := "Tracked characters :\n"
-	for _, char := range trackedCharacters[guildID] {
-		// TODO: Add latest report EndTime from db
-		res += char.Slug() + "\n"
-	}
-
-	return res
+	return trackedCharacters[guildID], ""
 }
 
 func getAndStoreAllWCLogsParsesForCharacter(guildID string, char *TrackedCharacter) (*wclogs.Parses, error) {

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"strconv"
 
 	"github.com/bwmarrin/discordgo"
@@ -264,13 +265,35 @@ var commandsHandlers = map[string]func(s *discordgo.Session, i *discordgo.Intera
 		}
 	},
 	"list-tracked-characters": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-		response := listTrackedCharacters(i.GuildID)
+		var data *discordgo.InteractionResponseData
+		chars, errorStr := getTrackedCharacters(i.GuildID)
+		if errorStr != "" {
+			data = &discordgo.InteractionResponseData{
+				Content: errorStr,
+			}
+		} else {
+			var charsStr = ""
+			for _, char := range chars {
+				charsStr += fmt.Sprintf("%s\n", char.Slug())
+			}
+			// TODO: Add latest report EndTime from db
+			data = &discordgo.InteractionResponseData{
+				Embeds: []*discordgo.MessageEmbed{
+					{
+						Type: discordgo.EmbedTypeRich,
+						Fields: []*discordgo.MessageEmbedField{{
+							Name:   "Tracked characters",
+							Value:  charsStr,
+							Inline: true,
+						}},
+					},
+				},
+			}
+		}
 
 		err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
-			Data: &discordgo.InteractionResponseData{
-				Content: response,
-			},
+			Data: data,
 		})
 
 		if err != nil {
