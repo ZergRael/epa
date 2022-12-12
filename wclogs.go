@@ -226,26 +226,23 @@ func untrackCharacter(name, server, region, guildID string) string {
 }
 
 // currentParses returns cached performances for a character
-func currentParses(name, server, region, guildID string) map[string][]string {
+func currentParses(name, server, region, guildID string) (map[string][]string, string) {
 	log.Debug().Str("name", name).Str("server", server).Str("region", "region").
 		Str("guildID", guildID).Msg("currentParses")
 	if logs[guildID] == nil {
-		//return "Missing WarcraftLogs credentials setup"
-		return nil
+		return nil, "Missing WarcraftLogs credentials setup"
 	}
 
 	char, err := logs[guildID].GetCharacter(name, server, region)
 	if err != nil {
 		log.Error().Str("slug", char.Slug()).Err(err).Msg("GetCharacterID failed")
-		//return "Failed to get parses for " + char.Slug() + " : character not found !"
-		return nil
+		return nil, "Failed to get parses for " + char.Slug() + " : character not found !"
 	}
 
 	dbParses, err := fetchWCLogsParsesForCharacterID(db, char.ID)
 	if err != nil || dbParses == nil {
 		log.Warn().Str("slug", char.Slug()).Err(err).Msg("Not tracked")
-		//return char.Slug() + " is not tracked"
-		return nil
+		return nil, char.Slug() + " is not tracked"
 	}
 
 	var content = make(map[string][]string)
@@ -267,7 +264,7 @@ func currentParses(name, server, region, guildID string) map[string][]string {
 	}
 
 	log.Info().Str("slug", char.Slug()).Msg("Sent parses")
-	return content
+	return content, ""
 }
 
 // listTrackedCharacters returns a list of all known and tracked characters
