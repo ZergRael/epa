@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/bwmarrin/discordgo"
 	"math/rand"
 	"time"
 
@@ -277,6 +278,7 @@ func getTrackedCharacters(guildID string) ([]*TrackedCharacter, string) {
 	return trackedCharacters[guildID], ""
 }
 
+// getAndStoreAllWCLogsParsesForCharacter gets all available parses for a character and stores them in db
 func getAndStoreAllWCLogsParsesForCharacter(guildID string, char *TrackedCharacter) (*wclogs.Parses, error) {
 	log.Debug().Str("guildID", guildID).Msg("getAndStoreAllWCLogsParsesForCharacter")
 	parses, err := logs[guildID].GetParsesForCharacter(char.Character)
@@ -382,9 +384,16 @@ func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) erro
 func announceNewReport(report *wclogs.ReportMetadata, char *TrackedCharacter) {
 	log.Debug().Str("code", report.Code).Str("slug", char.Slug()).Msg("announceNewReport")
 	link := "https://classic.warcraftlogs.com/reports/" + report.Code
-	content := "New report for " + char.Slug() + " : " + link
 
-	_, err := s.ChannelMessageSend(char.ChannelID, content)
+	_, err := s.ChannelMessageSendEmbed(char.ChannelID, &discordgo.MessageEmbed{
+		Type:  discordgo.EmbedTypeRich,
+		URL:   link,
+		Title: "New report for " + char.Slug(),
+		Color: 0x904400,
+		Footer: &discordgo.MessageEmbedFooter{
+			Text: link,
+		},
+	})
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to send message")
 	}
