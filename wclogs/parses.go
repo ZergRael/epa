@@ -28,6 +28,16 @@ type SizeRankings map[RaidSize]MetricRankings
 // Metric is either dps or hps
 type Metric string
 
+func (m *Metric) Emoji() string {
+	switch string(*m) {
+	case "dps":
+		return ":dps:"
+	case "hps":
+		return ":hps:"
+	}
+	return ":question:"
+}
+
 // MetricRankings contains Rankings for multiple Metric
 type MetricRankings map[Metric]PartitionRankings
 

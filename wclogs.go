@@ -434,12 +434,14 @@ func announceParse(ranking *wclogs.Ranking, dbRanking *wclogs.Ranking, report *w
 		reaction = badParse[rand.Intn(len(badParse))]
 	}
 
-	content := fmt.Sprintf("New parse for %s on %s(%d) : %s :arrow_right: **%s** [%s] %s\n"+
-		"%s", char.Slug(), ranking.Encounter.Name, report.Size,
-		fmt.Sprintf("%.2f", dbRanking.RankPercent), fmt.Sprintf("%.2f", ranking.RankPercent),
-		string(metric), reaction, link)
-
-	_, err := s.ChannelMessageSend(char.ChannelID, content)
+	_, err := s.ChannelMessageSendEmbed(char.ChannelID, &discordgo.MessageEmbed{
+		Type:  discordgo.EmbedTypeRich,
+		URL:   link,
+		Title: fmt.Sprintf("New parse for %s", char.Slug()),
+		Description: fmt.Sprintf("**%s(%d)** %s : %s :arrow_right: **%s** %s",
+			ranking.Encounter.Name, report.Size, metric.Emoji(),
+			fmt.Sprintf("%.2f", dbRanking.RankPercent), fmt.Sprintf("%.2f", ranking.RankPercent), reaction),
+	})
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to send message")
 	}
