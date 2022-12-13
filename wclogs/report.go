@@ -15,10 +15,11 @@ type ReportMetadata struct {
 
 // Report represents WarcraftLogs report including metadata and latest kill-fight
 type Report struct {
-	Code    string
-	EndTime time.Time
-	ZoneID  ZoneID
-	Size    RaidSize
+	Code       string
+	EndTime    time.Time
+	ZoneID     ZoneID
+	Size       RaidSize
+	Characters []int
 }
 
 // GetLatestReportMetadata queries latest Report for a specific Character
@@ -177,13 +178,7 @@ func (w *WCLogs) GetReport(reportCode string) (*Report, error) {
 					ID int
 				}
 				RankedCharacters []struct {
-					Name   string
-					Server struct {
-						Name   string
-						Region struct {
-							Slug string
-						}
-					}
+					ID int
 				}
 				Fights []struct {
 					ID          int
@@ -198,13 +193,18 @@ func (w *WCLogs) GetReport(reportCode string) (*Report, error) {
 		return nil, err
 	}
 
-	report := &resp.ReportData.Report
+	report := resp.ReportData.Report
 	lastFight := report.Fights[len(report.Fights)-1]
+	var charIDs []int
+	for _, c := range report.RankedCharacters {
+		charIDs = append(charIDs, c.ID)
+	}
 
 	return &Report{
-		Code:    report.Code,
-		EndTime: time.UnixMilli(int64(report.EndTime)),
-		Size:    RaidSize(lastFight.Size),
-		ZoneID:  cachedZones.GetZoneIDForEncounter(lastFight.EncounterID),
+		Code:       report.Code,
+		EndTime:    time.UnixMilli(int64(report.EndTime)),
+		Size:       RaidSize(lastFight.Size),
+		ZoneID:     cachedZones.GetZoneIDForEncounter(lastFight.EncounterID),
+		Characters: charIDs,
 	}, nil
 }
