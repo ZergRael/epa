@@ -105,8 +105,8 @@ func (w *WCLogs) GetLatestReport(char *Character) (*Report, error) {
 						Zone    struct {
 							ID int
 						}
-						// TODO: Get fights only when needed (EndTime diff)
 						Fights []struct {
+							ID          int
 							EncounterID int
 							Size        int
 						}
@@ -125,6 +125,80 @@ func (w *WCLogs) GetLatestReport(char *Character) (*Report, error) {
 	}
 
 	report := &resp.CharacterData.Character.RecentReports.Data[0]
+	lastFight := report.Fights[len(report.Fights)-1]
+
+	return &Report{
+		Code:    report.Code,
+		EndTime: time.UnixMilli(int64(report.EndTime)),
+		Size:    RaidSize(lastFight.Size),
+		ZoneID:  cachedZones.GetZoneIDForEncounter(lastFight.EncounterID),
+	}, nil
+}
+
+// GetReport queries a specific report
+func (w *WCLogs) GetReport(reportCode string) (*Report, error) {
+	req := graphql.NewRequest(`
+    query ($code: String!) {
+		reportData {
+			report(code: $code) {
+				endTime
+				code
+				zone {
+					id
+				}
+				rankedCharacters {
+					name
+					server {
+						slug
+						region {
+							slug
+						}
+					}
+				}
+				fights(killType: Kills) {
+					id
+					encounterID
+					name
+					size
+				}
+			}
+		}
+    }
+`)
+
+	req.Var("code", reportCode)
+
+	var resp struct {
+		ReportData struct {
+			Report struct {
+				Code    string
+				EndTime float64
+				Zone    struct {
+					ID int
+				}
+				RankedCharacters []struct {
+					Name   string
+					Server struct {
+						Name   string
+						Region struct {
+							Slug string
+						}
+					}
+				}
+				Fights []struct {
+					ID          int
+					EncounterID int
+					Size        int
+				}
+			}
+		}
+	}
+
+	if err := w.client.Run(context.Background(), req, &resp); err != nil {
+		return nil, err
+	}
+
+	report := &resp.ReportData.Report
 	lastFight := report.Fights[len(report.Fights)-1]
 
 	return &Report{

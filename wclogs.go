@@ -305,8 +305,8 @@ func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) erro
 		}
 	}
 
-	// Get the latest full report from WCLogs
-	fullReport, err := logs[guildID].GetLatestReport(char.Character)
+	// Get the full report from WCLogs
+	fullReport, err := logs[guildID].GetReport(report.Code)
 	if err != nil {
 		return err
 	}

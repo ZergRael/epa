@@ -231,7 +231,7 @@ var commandsHandlers = map[string]func(s *discordgo.Session, i *discordgo.Intera
 			for _, char := range chars {
 				charsStr += fmt.Sprintf("%s\n", char.Slug())
 			}
-			// TODO: Add latest report EndTime from db
+			// TODO: Add the latest report EndTime from db
 			data = &discordgo.InteractionResponseData{
 				Embeds: []*discordgo.MessageEmbed{
 					{
