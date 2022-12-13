@@ -146,7 +146,6 @@ var commandsHandlers = map[string]func(s *discordgo.Session, i *discordgo.Intera
 			log.Error().Err(err).Msg("/epa command response failed")
 		}
 	},
-
 	"register-warcraftlogs": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		clientID := i.ApplicationCommandData().Options[0].StringValue()
 		clientSecret := i.ApplicationCommandData().Options[1].StringValue()
@@ -180,7 +179,6 @@ var commandsHandlers = map[string]func(s *discordgo.Session, i *discordgo.Intera
 			log.Error().Err(err).Msg("/unregister-warcraftlogs command response failed")
 		}
 	},
-
 	"track-character": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		char := i.ApplicationCommandData().Options[0].StringValue()
 		server := i.ApplicationCommandData().Options[1].StringValue()
@@ -215,49 +213,6 @@ var commandsHandlers = map[string]func(s *discordgo.Session, i *discordgo.Intera
 			Data: &discordgo.InteractionResponseData{
 				Content: response,
 			},
-		})
-
-		if err != nil {
-			log.Error().Err(err).Msg("/untrack-character command response failed")
-		}
-	},
-	"parses": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-		char := i.ApplicationCommandData().Options[0].StringValue()
-		server := i.ApplicationCommandData().Options[1].StringValue()
-		region := i.ApplicationCommandData().Options[2].StringValue()
-
-		var data *discordgo.InteractionResponseData
-		content, errorStr := currentParses(char, server, region, i.GuildID)
-		if errorStr != "" {
-			data = &discordgo.InteractionResponseData{
-				Content: errorStr,
-			}
-		} else {
-			var fields []*discordgo.MessageEmbedField
-			for header, rows := range content {
-				var value string
-				for _, row := range rows {
-					value += row + "\n"
-				}
-				fields = append(fields, &discordgo.MessageEmbedField{
-					Name:   header,
-					Value:  value,
-					Inline: true,
-				})
-			}
-			data = &discordgo.InteractionResponseData{
-				Embeds: []*discordgo.MessageEmbed{
-					{
-						Type:   discordgo.EmbedTypeRich,
-						Fields: fields,
-					},
-				},
-			}
-		}
-
-		err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-			Type: discordgo.InteractionResponseChannelMessageWithSource,
-			Data: data,
 		})
 
 		if err != nil {
