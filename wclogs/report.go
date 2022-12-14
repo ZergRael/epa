@@ -148,13 +148,7 @@ func (w *WCLogs) GetReport(reportCode string) (*Report, error) {
 					id
 				}
 				rankedCharacters {
-					name
-					server {
-						slug
-						region {
-							slug
-						}
-					}
+					id
 				}
 				fights(killType: Kills) {
 					id

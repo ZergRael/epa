@@ -303,7 +303,7 @@ func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) erro
 	log.Info().Int("charID", char.ID).Str("slug", char.Slug()).Str("code", report.Code).
 		Int64("endTime", fullReport.EndTime.UnixMilli()).Int64("dbEndTime", dbReport.EndTime.UnixMilli()).
 		Int("zoneID", int(fullReport.ZoneID)).Int("size", int(fullReport.Size)).
-		Msg("Latest report changes")
+		Int("players", len(fullReport.Characters)).Msg("Latest report changes")
 
 	var charsInReport []*TrackedCharacter
 	// Scan report for any tracked characters
