@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/bwmarrin/discordgo"
 	"math/rand"
+	"strings"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -293,18 +294,6 @@ func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) erro
 		}
 	}
 
-	// Announce new report if code diff and end time is later than DB end time
-	if report.Code != dbReport.Code {
-		log.Info().
-			Int("charID", char.ID).Str("slug", char.Slug()).Str("code", report.Code).
-			Msg("New report code")
-
-		// Current report has to be older than stored one, anything else might indicate wclogs deletion
-		if report.EndTime.After(dbReport.EndTime) {
-			announceNewReport(report, char)
-		}
-	}
-
 	// Get the full report from WCLogs
 	fullReport, err := logs[guildID].GetReport(report.Code)
 	if err != nil {
@@ -316,38 +305,79 @@ func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) erro
 		Int("zoneID", int(fullReport.ZoneID)).Int("size", int(fullReport.Size)).
 		Msg("Latest report changes")
 
-	// Store new report in DB
-	err = storeWCLogsLatestReportForCharacterID(db, char.ID, report)
-	if err != nil {
-		return err
+	var charsInReport []*TrackedCharacter
+	// Scan report for any tracked characters
+	for _, c := range trackedCharacters[guildID] {
+		for _, charID := range fullReport.Characters {
+			// Tracked char found
+			if c.ID == charID {
+				charsInReport = append(charsInReport, c)
+			}
+		}
 	}
 
-	// TODO: Scan report for more tracked characters
+	// Announce new report if code diff and end time is later than DB end time
+	if report.Code != dbReport.Code {
+		log.Info().
+			Int("charID", char.ID).Str("slug", char.Slug()).Str("code", report.Code).
+			Msg("New report code")
 
-	// Get report zone/size specific parses from WCLogs
-	metricRankings, err := logs[guildID].GetMetricRankingsForCharacter(char.Character, fullReport.ZoneID, fullReport.Size)
-	if err != nil {
-		return err
+		// Current report has to be older than stored one, anything else might indicate wclogs deletion
+		if report.EndTime.After(dbReport.EndTime) {
+			announceNewReport(report, charsInReport)
+		}
 	}
 
-	// Compare and announce if necessary
-	compareParsesAndAnnounce(metricRankings, dbParses, fullReport, char)
+	for _, c := range charsInReport {
+		// Store new report in DB
+		err = storeWCLogsLatestReportForCharacterID(db, c.ID, report)
+		if err != nil {
+			return err
+		}
 
-	// Merge parses into DB
-	dbParses.MergeMetricRankings(fullReport.ZoneID, fullReport.Size, metricRankings)
-	return storeWCLogsParsesForCharacterID(db, char.ID, dbParses)
+		// Get report zone/size specific parses from WCLogs
+		metricRankings, err := logs[guildID].GetMetricRankingsForCharacter(c.Character, fullReport.ZoneID, fullReport.Size)
+		if err != nil {
+			return err
+		}
+
+		// Get parses from DB
+		dbParses, err := fetchWCLogsParsesForCharacterID(db, char.ID)
+		if err != nil {
+			return err
+		}
+
+		// Compare and announce if necessary
+		compareParsesAndAnnounce(metricRankings, dbParses, fullReport, c)
+
+		// Merge parses into DB
+		dbParses.MergeMetricRankings(fullReport.ZoneID, fullReport.Size, metricRankings)
+		err = storeWCLogsParsesForCharacterID(db, c.ID, dbParses)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // announceNewReport formats and sends a new report announcement
-func announceNewReport(report *wclogs.ReportMetadata, char *TrackedCharacter) {
-	log.Debug().Str("code", report.Code).Str("slug", char.Slug()).Msg("announceNewReport")
+func announceNewReport(report *wclogs.ReportMetadata, chars []*TrackedCharacter) {
+	log.Debug().Str("code", report.Code).Int("chars", len(chars)).Msg("announceNewReport")
 	link := "https://classic.warcraftlogs.com/reports/" + report.Code
 
-	_, err := s.ChannelMessageSendEmbed(char.ChannelID, &discordgo.MessageEmbed{
-		Type:  discordgo.EmbedTypeRich,
-		URL:   link,
-		Title: "New report for " + char.Slug(),
-		Color: 0x904400,
+	var charSlugs []string
+	for _, c := range chars {
+		charSlugs = append(charSlugs, c.Slug())
+	}
+
+	// TODO: Channel ID should be a Guild param, not per TrackedCharacter
+	_, err := s.ChannelMessageSendEmbed(chars[0].ChannelID, &discordgo.MessageEmbed{
+		Type:        discordgo.EmbedTypeRich,
+		URL:         link,
+		Title:       "New report found",
+		Description: strings.Join(charSlugs, "\n"),
+		Color:       0x904400,
 		Footer: &discordgo.MessageEmbedFooter{
 			Text: link,
 		},
