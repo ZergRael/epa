@@ -287,7 +287,7 @@ func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) erro
 	dbParses, err := fetchWCLogsParsesForCharacterID(db, char.ID)
 	if err != nil || dbParses == nil {
 		// Missing initial parses
-		log.Debug().Int("charID", char.ID).Str("slug", char.Slug()).Msg("Missing initial parses")
+		log.Warn().Int("charID", char.ID).Str("slug", char.Slug()).Msg("Missing initial parses")
 		dbParses, err = getAndStoreAllWCLogsParsesForCharacter(guildID, char)
 		if err != nil {
 			return err
@@ -342,7 +342,7 @@ func checkWCLogsForCharacterUpdates(guildID string, char *TrackedCharacter) erro
 		}
 
 		// Get parses from DB
-		dbParses, err := fetchWCLogsParsesForCharacterID(db, char.ID)
+		dbParses, err := fetchWCLogsParsesForCharacterID(db, c.ID)
 		if err != nil {
 			return err
 		}
@@ -400,9 +400,10 @@ func compareParsesAndAnnounce(metricRankings *wclogs.MetricRankings, dbParses *w
 				if ranking.Encounter.ID == dbRanking.Encounter.ID {
 					if ranking.RankPercent-dbRanking.RankPercent > 0.1 {
 						log.Info().
-							Str("metric", string(metric)).
-							Int("charID", char.ID).Float64("oldParse", dbRanking.RankPercent).
-							Float64("newParse", ranking.RankPercent).Msg("New parse !")
+							Str("slug", char.Slug()).Int("charID", char.ID).
+							Str("code", report.Code).Str("encounter", ranking.Encounter.Name).
+							Str("metric", string(metric)).Float64("oldParse", dbRanking.RankPercent).
+							Float64("newParse", ranking.RankPercent).Msg("New parse")
 
 						announceParse(&ranking, &dbRanking, report, metric, char)
 					}
