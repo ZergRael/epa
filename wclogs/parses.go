@@ -31,9 +31,9 @@ type Metric string
 func (m *Metric) Emoji() string {
 	switch string(*m) {
 	case "dps":
-		return ":dps:"
+		return "<:dps:1052306073622675537>"
 	case "hps":
-		return ":hps:"
+		return "<:heal:1052305955611746365>"
 	}
 	return ":question:"
 }
